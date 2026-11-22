@@ -91,8 +91,25 @@ POOL_API_SECRET=choose-a-long-password .venv/bin/python main.py
 - [docs/abnahme.md](docs/abnahme.md): acceptance checklist for the real hardware
 - [ROADMAP.md](ROADMAP.md): open items (safety, hardware, software)
 
-## Safety
+## Disclaimer
 
-The dashboard's "switch everything off" is a software stop, not an emergency
-stop in the regulatory sense. Mains-voltage work requires a lockable isolator
-and a qualified electrician.
+> [!WARNING]
+> This is a private hobby project, published as-is for reference. It is
+> provided **without any warranty**, express or implied, including fitness for
+> a particular purpose. **Use at your own risk.** The author accepts no liability
+> for damage to people, property, equipment or the environment.
+
+- The project controls **mains-powered equipment, water and, potentially,
+  pool chemicals**. Mistakes can cause electric shock, fire, flooding, pump damage
+  or chlorine-gas hazards.
+- Electrical installation and any work on 230 V must be done by a **qualified
+  electrician** according to local regulations (e.g. DIN VDE 0100-702 for pools),
+  including an RCD and a lockable isolator.
+- The dashboard's "switch everything off" is a **software stop, not an emergency
+  stop** in the regulatory sense, and no substitute for disconnecting power.
+- Software and hardware are tested only on one specific setup. Your pump, wiring
+  and configuration will differ. Verify voltages and behaviour yourself before
+  connecting anything.
+- Not affiliated with or endorsed by any of the manufacturers mentioned
+  (e.g. Speck Pumpen, Raspberry Pi, Microchip). Product names are trademarks of
+  their respective owners.
