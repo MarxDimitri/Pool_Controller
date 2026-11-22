@@ -217,7 +217,7 @@ Fehlt die Datei, startet der Dienst trotzdem.
 
 ```bash
 cd /opt/pool_marx/pool_controller/deploy
-sudo install -m 600 -o pi -g pi telemetry.env.example /etc/pool_marx/telemetry.env
+sudo install -m 600 -o root -g root telemetry.env.example /etc/pool_marx/telemetry.env
 sudo nano /etc/pool_marx/telemetry.env
 ```
 
