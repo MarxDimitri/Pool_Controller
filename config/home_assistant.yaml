@@ -1,0 +1,112 @@
+# ============================================================
+#  Pool Marx — Home Assistant Konfiguration
+#  In configuration.yaml einfügen oder als Include
+# ============================================================
+
+# ── MQTT Integration ──────────────────────────────────────────
+# (In HA GUI unter Einstellungen → Integrationen → MQTT)
+# Broker: <Raspberry Pi IP>
+# Port: 1883
+# User: pool
+# Passwort: siehe POOL_MQTT_PASSWORD in /etc/pool_marx/secrets.env auf dem Pi
+
+# ── Automatisierungen ─────────────────────────────────────────
+automation:
+  # Benachrichtigung wenn Wasserstand zu niedrig
+  - alias: "Pool — Wasserstand niedrig"
+    trigger:
+      - platform: mqtt
+        topic: "pool_marx/level"
+        payload: "low"
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "⚠ Pool Marx"
+          message: "Wasserstand zu niedrig — Nachspeisung prüfen"
+
+  # Benachrichtigung Frostschutz aktiv
+  - alias: "Pool — Frostschutz aktiv"
+    trigger:
+      - platform: mqtt
+        topic: "pool_marx/pump/frost"
+        payload: "True"
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "❄ Pool Marx — Frostschutz"
+          message: "Temperatur unter 3°C — Frostschutzpumpe läuft"
+
+  # pH-Alarm
+  - alias: "Pool — pH außerhalb Bereich"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.pool_marx_ph_wert
+        above: 7.6
+      - platform: numeric_state
+        entity_id: sensor.pool_marx_ph_wert
+        below: 7.0
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "⚗ Pool Marx — pH-Alarm"
+          message: >
+            pH-Wert {{ states('sensor.pool_marx_ph_wert') }} —
+            Sollbereich: 7.0–7.6
+
+  # ORP-Alarm (Chlor zu niedrig)
+  - alias: "Pool — ORP zu niedrig (Chlormangel)"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.pool_marx_orp_redox
+        below: 650
+        for: "00:30:00"  # Erst nach 30 Min Alarm
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "🧪 Pool Marx — Chlor-Alarm"
+          message: >
+            ORP {{ states('sensor.pool_marx_orp_redox') }} mV —
+            Chlor nachfüllen!
+
+  # Sonnenuntergang → Beleuchtung ein (optional)
+  - alias: "Pool — Beleuchtung bei Sonnenuntergang"
+    trigger:
+      - platform: sun
+        event: sunset
+    condition:
+      - condition: state
+        entity_id: input_boolean.pool_auto_light
+        state: "on"
+    action:
+      - service: mqtt.publish
+        data:
+          topic: "pool_marx/cmd/light"
+          payload: "on"
+
+  # 23:00 → Beleuchtung aus
+  - alias: "Pool — Beleuchtung Nacht"
+    trigger:
+      - platform: time
+        at: "23:00:00"
+    action:
+      - service: mqtt.publish
+        data:
+          topic: "pool_marx/cmd/light"
+          payload: "off"
+
+# ── Dashboard Karte (Lovelace) ────────────────────────────────
+# Füge dies in dein Lovelace Dashboard ein:
+#
+# type: vertical-stack
+# cards:
+#   - type: entities
+#     title: Pool Marx
+#     entities:
+#       - switch.pool_pumpe
+#       - number.pool_pumpe_drehzahl
+#       - sensor.pool_wassertemperatur
+#       - sensor.pool_ph_wert
+#       - sensor.pool_orp_redox
+#       - binary_sensor.pool_frostschutz
+#       - binary_sensor.pool_wasserstand
+#       - switch.pool_beleuchtung

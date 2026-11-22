@@ -1,0 +1,173 @@
+# ============================================================
+#  Pool Marx — Konfiguration
+#  42m³ Außenpool | Speck Alpha ECO Soft
+# ============================================================
+
+pool:
+  name: "Pool Marx"
+  volume_m3: 42
+  location: ""               # optional, z. B. Ort
+
+# ── GPIO Belegung ────────────────────────────────────────────
+gpio:
+  pump_relay:       17    # Relais 1 — Pumpe Ein/Aus (230V)
+  backwash_relay:   27    # Relais 3 — BESGO Magnetventil
+  fill_relay:       22    # Relais 4 — Nachspeisung MV
+  ph_relay:         23    # Relais 5 — pH-Minus Dosierpumpe
+  chlor_relay:      24    # Relais 6 — Chlor Dosierpumpe
+  light_relay:      25    # Relais 7 — EVA Beleuchtung
+  level_switch:      5    # Schwimmerschalter Niveau (Input)
+  temp_sensor:       4    # DS18B20 (1-Wire)
+  # MCP4725 DAC für 0-10V Drehzahlregelung → I²C Bus (SDA=2, SCL=3)
+
+# ── Pumpe (Speck BADU Alpha ECO Soft) ───────────────────────
+pump:
+  # Drehzahlstufen 0-10V via MCP4725 DAC
+  # 0V = Stop, 10V = Maximaldrehzahl
+  # Spannung am LM358-Ausgang bei DAC-Wert 4095 (Kalibrierung).
+  # Nominal 3,3V × 3,2 = 10,56V — besser real messen und hier eintragen.
+  # Zwei-Punkt-Kalibrierung 2026-09-28: DAC 3102 → 7,92V, DAC 1175 → 2,987V
+  dac_full_scale_v: 10.483
+  dac_offset_v: -0.021
+  # Spannung, die die Pumpe als 100% anzeigt (gemessen: 8,00V → 79%, 3,00V → 30%)
+  input_full_scale_v: 10.13
+  speeds:
+    off:      0      # 0%   — Pumpe aus
+    min:      20     # 20%  — Mindestdrehzahl (Winterzirkulation)
+    eco:      30     # 30%  — Sparbetrieb (9 m³/h, 29.8 m/h Filtergeschw.)
+    normal:   60     # 60%  — Normalbetrieb
+    high:     80     # 80%  — Hochlast (Badebetrieb)
+    backwash: 100    # 100% — Rückspülung (volle Drehzahl)
+
+  # Tageszeiten-Programm (Außenpool)
+  schedule:
+    - name: "Morgenfilterung"
+      start: "07:00"
+      end:   "09:00"
+      speed: "normal"
+    - name: "Tagesbetrieb"
+      start: "09:00"
+      end:   "19:00"
+      speed: "eco"
+    - name: "Abendfiltreung"
+      start: "19:00"
+      end:   "21:00"
+      speed: "normal"
+    - name: "Nacht"
+      start: "21:00"
+      end:   "07:00"
+      speed: "off"
+
+  # Mindestdrehzahl statt 0 % (Zirkulation bei Temperaturen um/unter 0 °C).
+  # Ersetzt NUR geplante 0 % des Zeitplans — ein manuelles "Aus" bleibt aus,
+  # der Frostschutz hat weiterhin Vorrang.
+  min_speed:
+    mode: "winter"        # "off" | "always" | "winter"
+    speed: "min"          # Eintrag aus pump.speeds (20 %)
+    winter_months: [11, 12, 1, 2, 3]
+
+# ── Frostschutz ──────────────────────────────────────────────
+frost:
+  enabled: true
+  temp_threshold_c: 3.0      # Unter 3°C → Pumpe startet
+  pump_speed: "min"          # Minimaldrehzahl reicht für Frostschutz
+  run_minutes: 10            # Mindestlaufzeit wenn Frost erkannt
+  check_interval_sec: 300    # Alle 5 Minuten Temperatur prüfen
+
+# ── Rückspülung ──────────────────────────────────────────────
+backwash:
+  auto_enabled: true
+  # Automatisch jeden Montag um 10:00 Uhr
+  schedule:
+    day: "monday"
+    time: "10:00"
+  backwash_duration_sec: 180    # 3 Minuten rückspülen
+  rinse_duration_sec: 30        # 30 Sekunden nachspülen
+  pump_speed: "backwash"        # Volle Drehzahl beim Rückspülen
+
+# ── Frischwasser Nachspeisung ─────────────────────────────────
+fill:
+  enabled: true
+  level_pin_active_low: true   # Schwimmerschalter: LOW = Nachspeisung nötig
+  max_fill_minutes: 30         # Sicherheit: max 30 Min am Stück
+  pump_must_run: true          # Pumpe muss laufen für Einspeisung
+
+# ── Wasserchemie (pH + Chlor) ─────────────────────────────────
+chemistry:
+  # Sollwerte
+  ph_target: 7.2
+  ph_tolerance: 0.2           # ±0.2 → kein Eingriff
+  ph_min: 7.0
+  ph_max: 7.6
+  orp_target: 700             # mV — für freies Chlor 0.5-1.5 mg/l
+  orp_min: 650
+  orp_max: 780
+
+  # Dosierpumpen (Peristaltik)
+  ph_dose_ml_per_sec: 2.0     # Fördermenge pH-Minus Pumpe
+  chlor_dose_ml_per_sec: 2.0  # Fördermenge Chlor Pumpe
+  dose_interval_min: 30       # Nur alle 30 Min dosieren
+  max_dose_ml: 100            # Max Dosiermenge pro Zyklus
+
+# ── Beleuchtung ───────────────────────────────────────────────
+lighting:
+  auto_sunset: true           # Automatisch bei Sonnenuntergang ein
+  off_time: "23:00"           # Automatisch um 23:00 aus
+  latitude: 0.0               # eigene Koordinaten eintragen (für auto_sunset)
+  longitude: 0.0
+
+# ── MQTT ─────────────────────────────────────────────────────
+mqtt:
+  broker: "127.0.0.1"         # IP des MQTT-Brokers (auf dem Pi: lokaler Mosquitto)
+  port: 1883
+  username: "pool"            # überschreibbar per POOL_MQTT_USERNAME
+  # Passwort NICHT hier: Umgebungsvariable POOL_MQTT_PASSWORD
+  # (auf dem Pi in /etc/pool_marx/secrets.env)
+  topic_prefix: "pool_marx"
+  # Topics:
+  # pool_marx/pump/state       → "on"/"off"
+  # pool_marx/pump/speed       → 0-100
+  # pool_marx/temperature      → °C
+  # pool_marx/ph               → pH-Wert
+  # pool_marx/orp              → mV
+  # pool_marx/level            → "ok"/"low"
+  # pool_marx/frost            → "active"/"inactive"
+  # pool_marx/cmd/pump         → Befehl: "on"/"off"/"speed:60"
+  # pool_marx/cmd/backwash     → Befehl: "start"
+  # pool_marx/cmd/light        → Befehl: "on"/"off"
+
+# ── API Server ────────────────────────────────────────────────
+api:
+  host: "0.0.0.0"
+  port: 8080
+  # Dashboard-Passwort NICHT hier: Umgebungsvariable POOL_API_SECRET
+  # (auf dem Pi in /etc/pool_marx/secrets.env). Ohne Passwort ist die
+  # Web-Steuerung gesperrt, die Automatik läuft weiter.
+
+# ── Logging ──────────────────────────────────────────────────
+logging:
+  level: "INFO"
+  file: "/var/log/pool_marx/pool.log"
+  max_bytes: 10485760    # 10 MB
+  backup_count: 5
+
+# ── DAC 0-10V (MCP4725 → LM358) ──────────────────────────────
+# Prozent → Spannung: 0..100 % = 0..max_output_v. Der DAC-Code nutzt die
+# gemessene Kalibrierung pump.dac_full_scale_v/dac_offset_v (falls vorhanden),
+# sonst vdd × opamp_gain. max_output_v > 10 V wird hart auf 10 V geklemmt.
+dac:
+  vdd: 3.3
+  opamp_gain: 3.2
+  max_output_v: 9.5
+  ramp_pct_per_s: 5
+  refresh_interval_s: 0.2
+
+# ── Telemetrie (OpenTelemetry → z. B. Elastic Observability) ──
+# Endpunkt und API-Key NICHT hier: /etc/pool_marx/telemetry.env
+# (OTEL_EXPORTER_OTLP_ENDPOINT / _HEADERS / _PROTOCOL), siehe docs/telemetry.md
+telemetry:
+  enabled: false          # erst true, wenn Endpunkt und Key vorhanden sind
+  metrics_interval_s: 15
+  log_level: INFO
+  fastapi_instrumentation: false
+  system_metrics: true    # false, wenn der Collector (hostmetrics) das übernimmt

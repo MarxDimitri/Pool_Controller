@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Tests / Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Secrets und lokale Einstellungen — nie committen
+*.env
+!*.env.example
+.claude/settings.local.json
+
+# Alte Übertragungspakete (enthielten früher Zugangsdaten)
+*.tar.gz
+
+# macOS
+.DS_Store
+
+# Privates Netzwerkkonzept (Heimnetz-Details) — nur lokal
+docs/NETZWERK_SICHERHEIT.md

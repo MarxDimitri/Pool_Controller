@@ -1,0 +1,100 @@
+# Pool Marx — OpenTelemetry Collector auf dem Pi (Phase 2, optional)
+#
+# App (pool_marx) → http://127.0.0.1:4318 → dieser Collector → Elastic
+# Vorteile: persistente Queue (überbrückt Internetausfälle), Host-Metriken,
+# Resource-Detection. Gewählte Variante: otelcol-contrib (siehe docs/telemetry.md).
+#
+# Installation:
+#   sudo install -m 644 scripts/otelcol-pi.yaml /etc/pool_marx/otelcol-pi.yaml
+#   sudo install -m 644 scripts/otelcol-pi.service /etc/systemd/system/otelcol-pi.service
+#   Zugangsdaten in /etc/pool_marx/otelcol.env (chmod 600), siehe deploy/otelcol.env.example
+#
+# Prüfen:  /usr/bin/otelcol-contrib validate --config /etc/pool_marx/otelcol-pi.yaml
+
+extensions:
+  health_check:
+    endpoint: 127.0.0.1:13133
+  file_storage:
+    # systemd StateDirectory=otelcol-pi → /var/lib/otelcol-pi
+    directory: /var/lib/otelcol-pi
+    timeout: 2s
+    compaction:
+      on_start: true
+      directory: /var/lib/otelcol-pi
+      max_transaction_size: 65536
+
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 127.0.0.1:4318     # nur lokal erreichbar
+  hostmetrics:
+    collection_interval: 30s
+    scrapers:
+      cpu:
+        metrics:
+          system.cpu.utilization: { enabled: true }
+      load: {}
+      memory:
+        metrics:
+          system.memory.utilization: { enabled: true }
+      filesystem:
+        exclude_fs_types:
+          fs_types: [autofs, binfmt_misc, cgroup2, configfs, debugfs, devpts, devtmpfs,
+                     fusectl, mqueue, nsfs, overlay, proc, procfs, pstore, securityfs,
+                     sysfs, tmpfs, tracefs]
+          match_type: strict
+      disk: {}
+      network: {}
+
+processors:
+  # Pi 4 mit 2 GB RAM: harte Grenze für den Collector (zusätzlich GOMEMLIMIT
+  # und MemoryMax in der systemd-Unit)
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 150
+    spike_limit_mib: 40
+  resourcedetection:
+    detectors: [system]
+    system:
+      hostname_sources: [os]
+    override: false                  # Attribute der App (service.*, host.name) behalten
+  batch:
+    send_batch_size: 512
+    send_batch_max_size: 1024
+    timeout: 10s
+
+exporters:
+  otlphttp/elastic:
+    endpoint: ${env:ELASTIC_OTLP_ENDPOINT}
+    headers:
+      Authorization: ${env:ELASTIC_OTLP_AUTH}   # "ApiKey <key>"
+    compression: gzip
+    timeout: 15s
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 120s
+      max_elapsed_time: 0            # nie aufgeben — die Queue ist persistent
+    sending_queue:
+      enabled: true
+      storage: file_storage          # überlebt Neustarts und Internetausfälle
+      num_consumers: 2
+      queue_size: 2000               # Batches (~ einige Tage bei Pool-Datenmenge)
+
+service:
+  extensions: [health_check, file_storage]
+  telemetry:
+    logs:
+      level: warn
+    metrics:
+      level: none                    # keine eigene :8888-Metrik-Schnittstelle
+  pipelines:
+    metrics:
+      receivers: [otlp, hostmetrics]
+      processors: [memory_limiter, resourcedetection, batch]
+      exporters: [otlphttp/elastic]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, batch]
+      exporters: [otlphttp/elastic]

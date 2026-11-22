@@ -1,0 +1,18 @@
+fastapi
+uvicorn
+pyyaml
+aiomqtt
+# Nur auf dem Raspberry Pi (ohne diese Pakete läuft die Software im Simulationsmodus)
+smbus2; platform_machine == "aarch64" or platform_machine == "armv7l"
+RPi.GPIO; platform_machine == "aarch64" or platform_machine == "armv7l"
+
+# Telemetrie (OpenTelemetry, Export per OTLP/HTTP — kein grpcio-Build auf dem Pi).
+# Versionen gepinnt: services/telemetry.py nutzt den (in 1.45 als deprecated
+# markierten, aber funktionsfähigen) LoggingHandler aus dem SDK.
+opentelemetry-api==1.45.2
+opentelemetry-sdk==1.45.2
+opentelemetry-exporter-otlp-proto-http==1.45.2
+# Optional (per config abschaltbar): telemetry.system_metrics / fastapi_instrumentation
+opentelemetry-instrumentation-system-metrics==0.66b2
+psutil==7.2.2
+opentelemetry-instrumentation-fastapi==0.66b2

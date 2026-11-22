@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pool Marx</title>
+<style>
+  :root{
+    --blue-50:#f0f9ff; --blue-100:#e0f2fe; --blue-500:#0ea5e9; --blue-600:#0284c7; --blue-700:#0369a1;
+    --teal-500:#14b8a6;
+    --amber-500:#f59e0b; --amber-600:#d97706;
+    --red-500:#ef4444; --red-600:#dc2626;
+    --gray-50:#f8fafc; --gray-100:#f1f5f9; --gray-200:#e2e8f0; --gray-400:#94a3b8;
+    --gray-500:#64748b; --gray-700:#334155; --gray-800:#1e293b; --gray-900:#0f172a;
+    --card-bg:#ffffff; --page-bg-a:#e0f2fe; --page-bg-b:#f0fdfa;
+    --text:#0f172a; --text-muted:#64748b; --border:#e2e8f0;
+    --shadow:0 1px 2px rgba(15,23,42,.04), 0 8px 24px -8px rgba(15,23,42,.10);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --card-bg:#111c2e; --page-bg-a:#071019; --page-bg-b:#0b1b2b;
+      --text:#e8f1fb; --text-muted:#93a4bd; --border:#1e2f45;
+      --gray-100:#16233a; --gray-200:#1e2f45;
+      --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -8px rgba(0,0,0,.5);
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:linear-gradient(160deg,var(--page-bg-a),var(--page-bg-b) 60%);
+    color:var(--text);
+    min-height:100vh;
+    padding:16px 16px 48px;
+  }
+  .wrap{max-width:520px; margin:0 auto;}
+
+  header{display:flex; align-items:center; justify-content:space-between; padding:8px 4px 20px;}
+  header h1{font-size:22px; margin:0; display:flex; align-items:center; gap:8px; letter-spacing:-.01em;}
+  header .pool-meta{font-size:12.5px; color:var(--text-muted); margin-top:2px;}
+  .conn-dot{width:9px;height:9px;border-radius:50%;background:var(--gray-400); box-shadow:0 0 0 3px rgba(148,163,184,.15); transition:background .3s;}
+  .conn-dot.ok{background:#22c55e; box-shadow:0 0 0 3px rgba(34,197,94,.18);}
+  .conn-dot.bad{background:var(--red-500); box-shadow:0 0 0 3px rgba(239,68,68,.18);}
+
+  .card{
+    background:var(--card-bg); border-radius:20px; padding:20px;
+    box-shadow:var(--shadow); margin-bottom:14px; border:1px solid var(--border);
+  }
+  .card h2{font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); margin:0 0 14px; font-weight:700;}
+
+  .badge{
+    display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:600;
+    padding:5px 12px; border-radius:999px; white-space:nowrap;
+  }
+  .badge.blue{background:var(--blue-100); color:var(--blue-700);}
+  .badge.amber{background:#fef3c7; color:#92400e;}
+  .badge.cyan{background:#cffafe; color:#155e75;}
+  .badge.violet{background:#ede9fe; color:#5b21b6;}
+  .badge.gray{background:var(--gray-100); color:var(--text-muted);}
+  .badge.green{background:#dcfce7; color:#166534;}
+  .badge.red{background:#fee2e2; color:#991b1b;}
+  @media (prefers-color-scheme: dark){
+    .badge.blue{background:rgba(14,165,233,.15); color:#7dd3fc;}
+    .badge.amber{background:rgba(245,158,11,.15); color:#fcd34d;}
+    .badge.cyan{background:rgba(34,211,238,.15); color:#67e8f9;}
+    .badge.violet{background:rgba(139,92,246,.15); color:#c4b5fd;}
+    .badge.gray{background:var(--gray-100); color:var(--text-muted);}
+    .badge.green{background:rgba(34,197,94,.15); color:#86efac;}
+    .badge.red{background:rgba(239,68,68,.15); color:#fca5a5;}
+  }
+
+  .status-row{display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;}
+  .speed-display{display:flex; align-items:baseline; gap:6px; margin:4px 0 18px;}
+  .speed-display .num{font-size:52px; font-weight:800; line-height:1; letter-spacing:-.02em;}
+  .speed-display .pct{font-size:22px; font-weight:700; color:var(--text-muted);}
+  .speed-track{
+    position:relative; height:10px; border-radius:999px; background:var(--gray-200); overflow:hidden; margin-bottom:6px;
+  }
+  .speed-track .fill{
+    position:absolute; inset:0 auto 0 0; width:0%; border-radius:999px;
+    background:linear-gradient(90deg,var(--blue-500),var(--teal-500));
+    transition:width .4s ease;
+  }
+  input[type=range]{
+    -webkit-appearance:none; width:100%; height:36px; background:transparent; margin:6px 0 2px; cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-runnable-track{height:10px; border-radius:999px; background:var(--gray-200);}
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:26px; height:26px; border-radius:50%; background:#fff;
+    border:3px solid var(--blue-600); margin-top:-8px; box-shadow:0 2px 6px rgba(0,0,0,.25);
+  }
+  input[type=range]::-moz-range-track{height:10px; border-radius:999px; background:var(--gray-200);}
+  input[type=range]::-moz-range-thumb{width:20px; height:20px; border-radius:50%; background:#fff; border:3px solid var(--blue-600);}
+
+  .presets{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:14px;}
+  .preset-btn{
+    border:1.5px solid var(--border); background:var(--gray-50); color:var(--text);
+    border-radius:14px; padding:10px 4px; font-size:13px; font-weight:600; cursor:pointer;
+    transition:.15s; text-align:center;
+  }
+  @media (prefers-color-scheme: dark){ .preset-btn{background:var(--gray-100);} }
+  .preset-btn small{display:block; font-weight:500; color:var(--text-muted); font-size:11px; margin-top:1px;}
+  .preset-btn.active{background:linear-gradient(135deg,var(--blue-500),var(--teal-500)); border-color:transparent; color:#fff;}
+  .preset-btn.active small{color:rgba(255,255,255,.85);}
+  .preset-btn:active{transform:scale(.96);}
+
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    border:none; border-radius:14px; padding:13px 18px; font-size:15px; font-weight:700;
+    cursor:pointer; width:100%; transition:.15s; -webkit-tap-highlight-color:transparent;
+  }
+  .btn:active{transform:scale(.98);}
+  .btn-primary{background:linear-gradient(135deg,var(--blue-500),var(--blue-600)); color:#fff;}
+  .btn-secondary{background:var(--gray-100); color:var(--text);}
+  .btn-ghost{background:transparent; color:var(--blue-600); border:1.5px solid var(--blue-500);}
+  .btn-danger{background:linear-gradient(135deg,var(--red-500),var(--red-600)); color:#fff;}
+  .btn-warn{background:linear-gradient(135deg,var(--amber-500),var(--amber-600)); color:#fff;}
+  .btn-row{display:flex; gap:10px; margin-top:10px;}
+  .btn:disabled{opacity:.5; cursor:not-allowed;}
+
+  .toggle-row{display:flex; align-items:center; justify-content:space-between;}
+  .toggle-row .label{font-size:16px; font-weight:600; display:flex; align-items:center; gap:10px;}
+  .switch{position:relative; width:52px; height:30px; flex:none;}
+  .switch input{opacity:0; width:0; height:0;}
+  .slider-toggle{
+    position:absolute; inset:0; background:var(--gray-200); border-radius:999px; cursor:pointer; transition:.2s;
+  }
+  .slider-toggle::before{
+    content:""; position:absolute; width:24px; height:24px; left:3px; top:3px; background:#fff;
+    border-radius:50%; transition:.2s; box-shadow:0 1px 3px rgba(0,0,0,.3);
+  }
+  .switch input:checked + .slider-toggle{background:linear-gradient(135deg,var(--blue-500),var(--teal-500));}
+  .switch input:checked + .slider-toggle::before{transform:translateX(22px);}
+
+  .info-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .info-tile{background:var(--gray-50); border-radius:14px; padding:12px 14px;}
+  @media (prefers-color-scheme: dark){ .info-tile{background:var(--gray-100);} }
+  .info-tile .k{font-size:11.5px; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:.04em;}
+  .info-tile .v{font-size:15px; font-weight:700; margin-top:3px;}
+
+  .banner{
+    display:flex; align-items:center; gap:10px; padding:12px 16px; border-radius:14px;
+    font-size:14px; font-weight:600; margin-bottom:14px;
+  }
+  .banner.frost{background:#cffafe; color:#155e75;}
+  .banner.warn{background:#fef3c7; color:#92400e;}
+  .banner.danger{background:#fee2e2; color:#991b1b;}
+  @media (prefers-color-scheme: dark){
+    .banner.frost{background:rgba(34,211,238,.14); color:#67e8f9;}
+    .banner.warn{background:rgba(245,158,11,.14); color:#fcd34d;}
+    .banner.danger{background:rgba(239,68,68,.14); color:#fca5a5;}
+  }
+  .banner button{margin-left:auto; flex:none;}
+
+  .divider{height:1px; background:var(--border); margin:16px 0;}
+
+  footer{text-align:center; color:var(--text-muted); font-size:12px; margin-top:24px;}
+
+  .toast{
+    position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px);
+    background:var(--gray-900); color:#fff; padding:11px 18px; border-radius:12px; font-size:13.5px;
+    font-weight:600; opacity:0; pointer-events:none; transition:.25s; z-index:50; max-width:90%; text-align:center;
+    box-shadow:0 10px 30px rgba(0,0,0,.3);
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>🏊 Pool Marx</h1>
+      <div class="pool-meta" id="poolMeta">42 m³</div>
+    </div>
+    <div style="display:flex; align-items:center; gap:7px;">
+      <span class="conn-dot" id="connDot"></span>
+      <span style="font-size:12.5px; color:var(--text-muted);" id="connLabel">verbinde…</span>
+    </div>
+  </header>
+
+  <!-- Login -->
+  <div class="card" id="loginCard" style="display:none;">
+    <h2>Anmelden</h2>
+    <form id="loginForm">
+      <input type="password" id="loginPw" autocomplete="current-password" placeholder="Passwort"
+        style="width:100%; box-sizing:border-box; padding:12px 14px; font-size:16px; border-radius:12px;
+               border:1px solid var(--gray-200); background:var(--gray-100); color:var(--text);">
+      <div class="btn-row"><button class="btn btn-secondary" type="submit">Anmelden</button></div>
+    </form>
+    <div id="loginMsg" style="font-size:12.5px; color:var(--text-muted); margin-top:8px; text-align:center;"></div>
+  </div>
+
+  <div id="main" style="display:none;">
+  <div id="banners"></div>
+
+  <!-- Pumpe -->
+  <div class="card">
+    <div class="status-row">
+      <h2 style="margin:0;">Pumpe</h2>
+      <span class="badge gray" id="modeBadge">–</span>
+    </div>
+
+    <div class="speed-display">
+      <span class="num" id="speedNum">–</span><span class="pct">%</span>
+    </div>
+    <div style="font-size:12.5px; color:var(--text-muted); text-align:center; margin:-4px 0 6px;" id="actualVal"></div>
+    <div class="speed-track"><div class="fill" id="speedFill"></div></div>
+    <input type="range" id="speedSlider" min="0" max="100" step="5" value="0">
+
+    <div class="presets">
+      <button class="preset-btn" data-speed="0">Aus<small>0%</small></button>
+      <button class="preset-btn" data-speed="30">Eco<small>30%</small></button>
+      <button class="preset-btn" data-speed="60">Normal<small>60%</small></button>
+      <button class="preset-btn" data-speed="80">Hoch<small>80%</small></button>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="btnSchedule">📅 Zurück zum Zeitplan</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" id="btnBackwash">🔄 Rückspülung starten</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="btnFaultNote">⚠️ Pumpenfehler notieren (z. B. E-04)</button>
+    </div>
+  </div>
+
+  <!-- Beleuchtung -->
+  <div class="card">
+    <h2>Beleuchtung</h2>
+    <div class="toggle-row">
+      <span class="label">💡 Pool-Beleuchtung</span>
+      <label class="switch">
+        <input type="checkbox" id="lightToggle">
+        <span class="slider-toggle"></span>
+      </label>
+    </div>
+  </div>
+
+  <!-- Status -->
+  <div class="card">
+    <h2>Status</h2>
+    <div class="info-grid">
+      <div class="info-tile">
+        <div class="k">Wasserstand</div>
+        <div class="v" id="levelVal">–</div>
+      </div>
+      <div class="info-tile">
+        <div class="k">Netzspannung Pumpe</div>
+        <div class="v" id="mainsVal">–</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Abschaltung (Software) -->
+  <div class="card">
+    <h2>Notfall</h2>
+    <button class="btn btn-danger" id="btnEstop">🛑 Alles abschalten</button>
+    <div style="font-size:12.5px; color:var(--text-muted); margin-top:8px; text-align:center;">
+      Schaltet alle Verbraucher ab, trennt die Pumpe vom Netz und sperrt die Automatik bis zur Quittierung.
+      Kein Ersatz für den Reparaturschalter bei Arbeiten an der Pumpe.
+    </div>
+  </div>
+  </div>
+
+  <footer>Pool Marx Steuerung · <span id="simTag"></span> · <a href="#" id="logoutLink" style="color:inherit;">Abmelden</a></footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = "";
+const els = {
+  connDot: document.getElementById("connDot"),
+  connLabel: document.getElementById("connLabel"),
+  modeBadge: document.getElementById("modeBadge"),
+  speedNum: document.getElementById("speedNum"),
+  actualVal: document.getElementById("actualVal"),
+  btnFaultNote: document.getElementById("btnFaultNote"),
+  speedFill: document.getElementById("speedFill"),
+  speedSlider: document.getElementById("speedSlider"),
+  lightToggle: document.getElementById("lightToggle"),
+  levelVal: document.getElementById("levelVal"),
+  mainsVal: document.getElementById("mainsVal"),
+  banners: document.getElementById("banners"),
+  toast: document.getElementById("toast"),
+  simTag: document.getElementById("simTag"),
+  btnSchedule: document.getElementById("btnSchedule"),
+  btnBackwash: document.getElementById("btnBackwash"),
+  btnEstop: document.getElementById("btnEstop"),
+  main: document.getElementById("main"),
+  loginCard: document.getElementById("loginCard"),
+  loginForm: document.getElementById("loginForm"),
+  loginPw: document.getElementById("loginPw"),
+  loginMsg: document.getElementById("loginMsg"),
+  logoutLink: document.getElementById("logoutLink"),
+};
+
+let state = { pump: null, hardware: null, mains: null };
+let sliderDirty = false;
+let sliderTimer = null;
+
+function toast(msg){
+  els.toast.textContent = msg;
+  els.toast.classList.add("show");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=>els.toast.classList.remove("show"), 2600);
+}
+
+async function api(path, opts){
+  try{
+    const res = await fetch(API + path, Object.assign({headers:{"Content-Type":"application/json"}}, opts||{}));
+    if(res.status === 401){ showLogin(); return null; }
+    if(!res.ok){
+      let detail = "";
+      try{ detail = (await res.json()).detail || ""; }catch(e){}
+      toast(detail || ("Fehler: " + res.status));
+      return null;
+    }
+    return await res.json();
+  }catch(e){
+    toast("Nicht erreichbar");
+    return null;
+  }
+}
+
+const MODE_LABEL = {
+  schedule: ["📅 Zeitplan", "blue"],
+  manual:   ["✋ Manuell", "amber"],
+  frost:    ["❄️ Frostschutz", "cyan"],
+  backwash: ["🔄 Rückspülung", "violet"],
+  off:      ["⏸ Aus", "gray"],
+  emergency:["🛑 Abgeschaltet", "red"],
+};
+
+function renderPump(p){
+  if(!p) return;
+  state.pump = p;
+  const [label, color] = MODE_LABEL[p.mode] || [p.mode, "gray"];
+  els.modeBadge.textContent = label;
+  els.modeBadge.className = "badge " + color;
+
+  els.speedNum.textContent = p.speed_pct;
+  els.speedFill.style.width = p.speed_pct + "%";
+  if(!sliderDirty) els.speedSlider.value = p.speed_pct;
+
+  document.querySelectorAll(".preset-btn").forEach(btn=>{
+    btn.classList.toggle("active", Number(btn.dataset.speed) === p.speed_pct);
+  });
+
+  // Während der Abschaltung sind alle Bedienelemente gesperrt
+  const locked = (p.mode === "emergency");
+  const backwash = (p.mode === "backwash");
+  els.btnSchedule.disabled = locked || (p.mode === "schedule");
+  els.btnBackwash.disabled = locked;
+  els.btnBackwash.textContent = backwash ? "⏹ Rückspülung abbrechen" : "🔄 Rückspülung starten";
+  els.speedSlider.disabled = locked || backwash;
+  els.lightToggle.disabled = locked;
+  document.querySelectorAll(".preset-btn").forEach(btn=>{ btn.disabled = locked || backwash; });
+  renderBanners();
+}
+
+function renderHardware(hw){
+  if(!hw) return;
+  state.hardware = hw;
+  els.lightToggle.checked = !!hw.light;
+  els.levelVal.textContent = hw.level_ok ? "OK" : "Niedrig ⚠️";
+  els.levelVal.parentElement.style.background = hw.level_ok ? "" : "#fee2e2";
+  els.simTag.textContent = hw.simulation ? "Simulationsmodus" : "";
+  if(hw.pump){
+    const a = hw.pump.actual_speed_pct, t = hw.pump.speed_pct;
+    els.actualVal.textContent = (a === undefined) ? "" :
+      (Math.abs(a - t) < 0.5 ? `Ist ${Math.round(a)} %` : `Ist ${Math.round(a)} % → Rampe auf ${t} %`)
+      + (hw.dac && hw.dac.write_errors ? ` · DAC-Fehler: ${hw.dac.write_errors}` : "");
+  }
+}
+
+function renderMains(m){
+  if(m == null) return;
+  state.mains = m;
+  els.mainsVal.textContent = m ? "Verbunden ✅" : "Getrennt ⛔";
+  renderBanners();
+}
+
+function renderBanners(){
+  let html = "";
+  const emergency = state.pump && state.pump.mode === "emergency";
+  if(emergency){
+    html += `<div class="banner danger">🛑 Abgeschaltet – alle Verbraucher aus, Automatik gesperrt
+      <button class="btn btn-warn" style="width:auto; padding:8px 14px;" id="btnAck">Quittieren</button></div>`;
+  }else if(state.mains === false){
+    html += `<div class="banner danger">⛔ Pumpe vom Netz getrennt
+      <button class="btn btn-warn" style="width:auto; padding:8px 14px;" id="btnAck">Zuschalten</button></div>`;
+  }
+  if(state.pump && state.pump.frost_active){
+    html += `<div class="banner frost">❄️ Frostschutz aktiv – Pumpe läuft zum Schutz vor Frost</div>`;
+  }
+  if(state.pump && state.pump.sensor_error){
+    html += `<div class="banner warn">🌡️ Temperatursensor liefert keine Werte – Software-Frostschutz kann nicht auslösen</div>`;
+  }
+  els.banners.innerHTML = html;
+  const r = document.getElementById("btnAck");
+  if(r) r.addEventListener("click", async ()=>{
+    if(!confirm("Pumpe wieder ans Netz nehmen? Vorher sicherstellen, dass niemand an Pumpe oder Anlage arbeitet. Die Pumpe bleibt danach aus.")) return;
+    const res = await api("/api/emergency/ack", {method:"POST"});
+    if(res){ toast("Quittiert – Pumpe am Netz, bleibt aus"); renderMains(res.mains_connected); }
+  });
+}
+
+async function loadInitial(){
+  const status = await api("/api/status");
+  if(status){
+    renderPump(status.pump);
+    renderHardware(status.hardware);
+    if(status.pool) els.poolMeta && (document.getElementById("poolMeta").textContent =
+      `${status.pool.volume_m3} m³ · ${status.pool.name}`);
+  }
+  const mains = await api("/api/pump/mains");
+  if(mains) renderMains(mains.mains_connected);
+}
+
+// --- WebSocket Live-Updates ---
+let ws, wsRetry = 1000;
+function connectWS(){
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  ws = new WebSocket(`${proto}://${location.host}/ws`);
+  ws.onopen = ()=>{
+    els.connDot.className = "conn-dot ok";
+    els.connLabel.textContent = "verbunden";
+    wsRetry = 1000;
+  };
+  ws.onclose = async ()=>{
+    els.connDot.className = "conn-dot bad";
+    els.connLabel.textContent = "getrennt – erneuter Versuch…";
+    const s = await checkSession();
+    if(s && !s.authenticated){ showLogin(); return; }
+    setTimeout(connectWS, wsRetry);
+    wsRetry = Math.min(wsRetry * 1.6, 15000);
+  };
+  ws.onerror = ()=> ws.close();
+  ws.onmessage = (ev)=>{
+    try{
+      const msg = JSON.parse(ev.data);
+      if(msg.type === "init" || msg.type === "state"){
+        // Kompletter Zustand — kommt bei jeder Änderung, egal von welchem Gerät
+        renderPump(msg.data.pump);
+        renderHardware(msg.data.hardware);
+        renderMains(msg.data.mains);
+      }else if(msg.type === "emergency_stop"){
+        toast("NOT-AUS ausgelöst");
+      }
+    }catch(e){}
+  };
+}
+
+// --- Interaktionen ---
+els.btnFaultNote.addEventListener("click", async ()=>{
+  const text = prompt("Pumpenfehler notieren – optionaler Text (z. B. \"E-04 im Display\"):", "E-04");
+  if(text === null) return;
+  const res = await api("/api/pump/fault-note", {method:"POST", body: JSON.stringify({text})});
+  if(res) toast("Fehlernotiz im Log gespeichert");
+});
+
+document.querySelectorAll(".preset-btn").forEach(btn=>{
+  btn.addEventListener("click", async ()=>{
+    const speed = Number(btn.dataset.speed);
+    const res = await api(`/api/pump/speed/${speed}`, {method:"POST"});
+    if(res) toast(`Pumpe auf ${speed}% gesetzt`);
+  });
+});
+
+els.speedSlider.addEventListener("input", ()=>{
+  sliderDirty = true;
+  els.speedNum.textContent = els.speedSlider.value;
+  els.speedFill.style.width = els.speedSlider.value + "%";
+  clearTimeout(sliderTimer);
+  sliderTimer = setTimeout(async ()=>{
+    const speed = Number(els.speedSlider.value);
+    const res = await api(`/api/pump/speed/${speed}`, {method:"POST"});
+    if(res) toast(`Pumpe auf ${speed}% gesetzt`);
+    sliderDirty = false;
+  }, 450);
+});
+
+const backwashRunning = ()=> state.pump && state.pump.mode === "backwash";
+
+els.btnSchedule.addEventListener("click", async ()=>{
+  if(backwashRunning()){
+    if(!confirm("Rückspülung abbrechen und zurück zum Zeitplan?")) return;
+    const res = await api("/api/backwash/cancel?resume_schedule=true", {method:"POST"});
+    if(res) toast("Rückspülung abgebrochen – zurück zum Zeitplan");
+    return;
+  }
+  const res = await api("/api/pump/schedule", {method:"POST"});
+  if(res) toast("Zurück zum Zeitplan");
+});
+
+els.btnBackwash.addEventListener("click", async ()=>{
+  if(backwashRunning()){
+    if(!confirm("Rückspülung abbrechen? Das Ventil schließt, die Pumpe kehrt zum vorherigen Betrieb zurück.")) return;
+    const res = await api("/api/backwash/cancel", {method:"POST"});
+    if(res) toast("Rückspülung abgebrochen");
+    return;
+  }
+  if(!confirm("Rückspülung jetzt starten? Läuft automatisch für mehrere Minuten.")) return;
+  const res = await api("/api/backwash/start", {method:"POST"});
+  if(res) toast("Rückspülung gestartet");
+});
+
+els.lightToggle.addEventListener("change", async ()=>{
+  const action = els.lightToggle.checked ? "on" : "off";
+  const res = await api("/api/light", {method:"POST", body: JSON.stringify({action})});
+  if(!res) els.lightToggle.checked = !els.lightToggle.checked;
+});
+
+els.btnEstop.addEventListener("click", async ()=>{
+  if(!confirm("Alles abschalten? Alle Verbraucher gehen aus, die Pumpe wird vom Netz getrennt und die Automatik bleibt gesperrt, bis jemand quittiert.")) return;
+  const res = await api("/api/emergency_stop", {method:"POST"});
+  if(res) toast("Alles abgeschaltet");
+});
+
+// --- Anmeldung ---
+let started = false;
+async function checkSession(){
+  try{
+    const res = await fetch(API + "/api/session");
+    return res.ok ? await res.json() : null;
+  }catch(e){ return null; }
+}
+
+function showLogin(msg){
+  els.main.style.display = "none";
+  els.loginCard.style.display = "";
+  els.loginMsg.textContent = msg || "";
+  if(ws){ ws.onclose = null; ws.close(); ws = null; }
+  els.connDot.className = "conn-dot bad";
+  els.connLabel.textContent = "nicht angemeldet";
+  started = false;
+  els.loginPw.focus();
+}
+
+function startDashboard(){
+  els.loginCard.style.display = "none";
+  els.main.style.display = "";
+  if(started) return;
+  started = true;
+  loadInitial();
+  connectWS();
+}
+
+els.loginForm.addEventListener("submit", async (ev)=>{
+  ev.preventDefault();
+  const res = await fetch(API + "/api/login", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({password: els.loginPw.value}),
+  }).catch(()=>null);
+  els.loginPw.value = "";
+  if(res && res.ok){ startDashboard(); return; }
+  if(res && res.status === 503){ els.loginMsg.textContent = "Kein Passwort konfiguriert (POOL_API_SECRET in /etc/pool_marx/secrets.env)."; return; }
+  els.loginMsg.textContent = res ? "Falsches Passwort" : "Nicht erreichbar";
+});
+
+els.logoutLink.addEventListener("click", async (ev)=>{
+  ev.preventDefault();
+  await fetch(API + "/api/logout", {method:"POST"}).catch(()=>null);
+  showLogin("Abgemeldet");
+});
+
+(async ()=>{
+  const s = await checkSession();
+  if(s && s.authenticated) startDashboard();
+  else showLogin(s && !s.configured ? "Kein Passwort konfiguriert (POOL_API_SECRET in /etc/pool_marx/secrets.env)." : "");
+})();
+setInterval(()=>{ if(started) loadInitial(); }, 30000); // Fallback-Sync falls WS mal aussetzt
+</script>
+</body>
+</html>

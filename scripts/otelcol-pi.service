@@ -1,0 +1,35 @@
+# Pool Marx — OpenTelemetry Collector (otelcol-contrib) als eigener Dienst
+#
+# Voraussetzung: otelcol-contrib .deb für arm64 installiert (bringt /usr/bin/otelcol-contrib
+# und den Benutzer "otelcol-contrib" mit). Den mitgelieferten Standarddienst abschalten:
+#   sudo systemctl disable --now otelcol-contrib
+# Dann:
+#   sudo install -m 644 scripts/otelcol-pi.service /etc/systemd/system/otelcol-pi.service
+#   sudo systemctl daemon-reload && sudo systemctl enable --now otelcol-pi
+#   journalctl -u otelcol-pi -f
+
+[Unit]
+Description=OpenTelemetry Collector fuer Pool Marx (OTLP -> Elastic)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=otelcol-contrib
+Group=otelcol-contrib
+EnvironmentFile=/etc/pool_marx/otelcol.env
+# Go-Laufzeit unter dem memory_limiter halten (Pi 4, 2 GB RAM)
+Environment=GOMEMLIMIT=160MiB
+ExecStart=/usr/bin/otelcol-contrib --config=/etc/pool_marx/otelcol-pi.yaml
+StateDirectory=otelcol-pi
+Restart=on-failure
+RestartSec=10
+MemoryMax=250M
+CPUQuota=50%
+Nice=10
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
