@@ -12,7 +12,6 @@ htmlcov/
 # Secrets und lokale Einstellungen — nie committen
 *.env
 !*.env.example
-.claude/settings.local.json
 
 # Alte Übertragungspakete (enthielten früher Zugangsdaten)
 *.tar.gz
@@ -22,3 +21,6 @@ htmlcov/
 
 # Privates Netzwerkkonzept (Heimnetz-Details) — nur lokal
 docs/NETZWERK_SICHERHEIT.md
+
+# Lokale Claude-Code-Einstellungen
+.claude/
