@@ -49,6 +49,8 @@ def test_auth_required(client, method, path):
 def test_status_and_pump(client):
     st = client.get("/api/status", headers=AUTH).json()
     assert st["pump"]["mode"] == "off" and "actual_speed_pct" in st["hardware"]["pump"]
+    assert st["protection"]["frost"]["state"] in ("ready", "sensor_missing", "active", "disabled")
+    assert st["protection"]["min_speed"]["mode"] == "winter"
     assert client.get("/api/pump", headers=AUTH).json()["speed_pct"] == 0
 
 
@@ -181,6 +183,7 @@ def test_websocket_init_and_update(client):
     with client.websocket_connect("/ws", headers=AUTH) as ws:
         init = ws.receive_json()
         assert init["type"] == "init" and init["data"]["mains"] is True
+        assert "frost" in init["data"]["protection"] and "min_speed" in init["data"]["protection"]
         client.post("/api/light", json={"action": "on"}, headers=AUTH)
         msg = ws.receive_json()
         while msg["type"] != "state" or not msg["data"]["hardware"]["light"]:

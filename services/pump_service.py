@@ -739,6 +739,51 @@ class PumpService:
         )
         return {**status, "note": note}
 
+    def protection_status(self) -> dict:
+        """
+        Frostschutz und Winterbetrieb (Mindestdrehzahl) für das Dashboard.
+        frost.state:     active | ready | sensor_missing | disabled
+        min_speed.state: active | standby (Saison, greift bei Zeitplan-0 %) |
+                         off_season | off
+        """
+        with self._state_lock:
+            frost_active = self.state.frost_active
+            sensor_error = self.state.sensor_error
+            min_active = self.state.min_speed_active
+        frost_enabled = bool(self.frost_config.get("enabled", True))
+        if not frost_enabled:
+            frost_state = "disabled"
+        elif frost_active:
+            frost_state = "active"
+        elif sensor_error:
+            frost_state = "sensor_missing"
+        else:
+            frost_state = "ready"
+
+        cfg = self._min_speed_cfg
+        in_season = self._min_speed_pct(self._now()) is not None
+        if cfg["mode"] == "off":
+            min_state = "off"
+        elif min_active:
+            min_state = "active"
+        elif in_season:
+            min_state = "standby"
+        else:
+            min_state = "off_season"
+        return {
+            "frost": {
+                "state": frost_state,
+                "threshold_c": self.frost_config.get("temp_threshold_c"),
+                "speed_pct": self._frost_pct(),
+            },
+            "min_speed": {
+                "state": min_state,
+                "mode": cfg["mode"],
+                "speed_pct": cfg["pct"],
+                "months": sorted(cfg["months"]),
+            },
+        }
+
     def get_metrics_snapshot(self) -> dict:
         """Thread-sichere Werte für Observable-Metriken (wird aus dem Metrik-Thread gelesen)"""
         with self._state_lock:

@@ -137,6 +137,13 @@
   @media (prefers-color-scheme: dark){ .info-tile{background:var(--gray-100);} }
   .info-tile .k{font-size:11.5px; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:.04em;}
   .info-tile .v{font-size:15px; font-weight:700; margin-top:3px;}
+  .info-tile .s{font-size:11.5px; color:var(--text-muted); margin-top:2px;}
+  .info-tile.on{background:#cffafe; color:#155e75;}
+  .info-tile.warn{background:#fef3c7; color:#92400e;}
+  @media (prefers-color-scheme: dark){
+    .info-tile.on{background:rgba(34,211,238,.16); color:#a5f3fc;}
+    .info-tile.warn{background:rgba(245,158,11,.16); color:#fcd34d;}
+  }
 
   .banner{
     display:flex; align-items:center; gap:10px; padding:12px 16px; border-radius:14px;
@@ -249,6 +256,16 @@
       <div class="info-tile">
         <div class="k">Netzspannung Pumpe</div>
         <div class="v" id="mainsVal">–</div>
+      </div>
+      <div class="info-tile" id="frostTile">
+        <div class="k">❄️ Frostschutz</div>
+        <div class="v" id="frostVal">–</div>
+        <div class="s" id="frostSub"></div>
+      </div>
+      <div class="info-tile" id="winterTile">
+        <div class="k">🌙 Winterbetrieb</div>
+        <div class="v" id="winterVal">–</div>
+        <div class="s" id="winterSub"></div>
       </div>
     </div>
   </div>
@@ -408,11 +425,53 @@ function renderBanners(){
   });
 }
 
+const MONTHS = ["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
+function monthRange(months){
+  // zusammenhängende (auch über den Jahreswechsel) Monate als "Nov–Mär"
+  if(!months || !months.length) return "";
+  const set = new Set(months);
+  if(set.size === 12) return "ganzjährig";
+  let start = months.find(m => !set.has(m === 1 ? 12 : m - 1));
+  if(start === undefined) return months.map(m => MONTHS[m-1]).join(", ");
+  let end = start, n = 1;
+  while(set.has(end === 12 ? 1 : end + 1) && n < set.size){ end = end === 12 ? 1 : end + 1; n++; }
+  if(n !== set.size) return months.map(m => MONTHS[m-1]).join(", ");
+  return start === end ? MONTHS[start-1] : `${MONTHS[start-1]}–${MONTHS[end-1]}`;
+}
+
+function setTile(tile, valEl, subEl, value, sub, cls){
+  valEl.textContent = value;
+  subEl.textContent = sub || "";
+  tile.className = "info-tile" + (cls ? " " + cls : "");
+}
+
+function renderProtection(p){
+  if(!p) return;
+  const f = p.frost, m = p.min_speed;
+  const fT = document.getElementById("frostTile"), wT = document.getElementById("winterTile");
+  const fV = document.getElementById("frostVal"), fS = document.getElementById("frostSub");
+  const wV = document.getElementById("winterVal"), wS = document.getElementById("winterSub");
+  ({
+    active:         () => setTile(fT, fV, fS, "Aktiv", `Pumpe mind. ${f.speed_pct} %`, "on"),
+    ready:          () => setTile(fT, fV, fS, "Bereit", `löst unter ${f.threshold_c} °C aus`),
+    sensor_missing: () => setTile(fT, fV, fS, "Kein Sensor ⚠️", "kann nicht auslösen", "warn"),
+    disabled:       () => setTile(fT, fV, fS, "Aus", "in der Config deaktiviert"),
+  }[f.state] || (() => setTile(fT, fV, fS, f.state, "")))();
+  const season = m.mode === "always" ? "ganzjährig" : monthRange(m.months);
+  ({
+    active:     () => setTile(wT, wV, wS, `Aktiv · ${m.speed_pct} %`, `statt Aus (${season})`, "on"),
+    standby:    () => setTile(wT, wV, wS, "Bereit", `${m.speed_pct} % statt Aus im Zeitplan`),
+    off_season: () => setTile(wT, wV, wS, "Außer Saison", season),
+    off:        () => setTile(wT, wV, wS, "Aus", "Mindestdrehzahl deaktiviert"),
+  }[m.state] || (() => setTile(wT, wV, wS, m.state, "")))();
+}
+
 async function loadInitial(){
   const status = await api("/api/status");
   if(status){
     renderPump(status.pump);
     renderHardware(status.hardware);
+    renderProtection(status.protection);
     if(status.pool) els.poolMeta && (document.getElementById("poolMeta").textContent =
       `${status.pool.volume_m3} m³ · ${status.pool.name}`);
   }
@@ -447,6 +506,7 @@ function connectWS(){
         renderPump(msg.data.pump);
         renderHardware(msg.data.hardware);
         renderMains(msg.data.mains);
+        renderProtection(msg.data.protection);
       }else if(msg.type === "emergency_stop"){
         toast("NOT-AUS ausgelöst");
       }

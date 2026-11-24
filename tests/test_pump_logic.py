@@ -488,3 +488,36 @@ def test_state_change_callback_async(sim_factory):
     run(main())
     assert ("pump", "manual") in got
     sim.svc._update_state(mode="manual")   # ohne Loop: Coroutine wird sauber verworfen
+
+
+# ── Dashboard: Frostschutz / Winterbetrieb ────────────────────
+
+@pytest.mark.parametrize("when,mode,expect", [
+    (WINTER.replace(hour=2), "winter", "active"),       # Nacht im Winter → 20 % statt Aus
+    (WINTER.replace(hour=10), "winter", "standby"),     # Saison, aber Tagbetrieb
+    (SUMMER.replace(hour=2), "winter", "off_season"),
+    (SUMMER.replace(hour=2), "off", "off"),
+    (SUMMER.replace(hour=10), "always", "standby"),
+])
+def test_protection_status_min_speed(sim_factory, config, when, mode, expect):
+    sim = sim_factory(when, cfg=_cfg_min(config, mode))
+    sim.svc.resume_schedule()
+    st = sim.svc.protection_status()["min_speed"]
+    assert st["state"] == expect
+    assert st["speed_pct"] == 20 and st["months"] == [1, 2, 3, 11, 12]
+
+
+def test_protection_status_frost_states(sim_factory, config):
+    sim = sim_factory(SUMMER.replace(hour=2))
+
+    async def main():
+        assert sim.svc.protection_status()["frost"]["state"] == "ready"
+        await sim.svc._frost_step(None)
+        assert sim.svc.protection_status()["frost"]["state"] == "sensor_missing"
+        await sim.svc._frost_step(1.0)
+        f = sim.svc.protection_status()["frost"]
+        assert f["state"] == "active" and f["threshold_c"] == 3.0 and f["speed_pct"] == 20
+    run(main())
+    cfg = copy.deepcopy(config)
+    cfg["frost"]["enabled"] = False
+    assert sim_factory(SUMMER, cfg=cfg).svc.protection_status()["frost"]["state"] == "disabled"

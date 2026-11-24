@@ -145,6 +145,7 @@ def create_app(pump_service, mqtt_service, hardware, api_config: Optional[dict] 
             "pump": pump_service.get_state(),
             "hardware": hardware.get_all_states(),
             "mains": hardware.pump_mains_connected,
+            "protection": pump_service.protection_status(),
         }
 
     last_pushed: dict = {}
@@ -240,6 +241,7 @@ def create_app(pump_service, mqtt_service, hardware, api_config: Optional[dict] 
             "timestamp": datetime.now().isoformat(),
             "pump": pump_state,
             "hardware": hw_state,
+            "protection": pump_service.protection_status(),
             "pool": {
                 "name": "Pool Marx",
                 "volume_m3": 42,
