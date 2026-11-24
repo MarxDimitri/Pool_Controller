@@ -12,6 +12,8 @@ Neue Einträge kommen unter **[Unreleased]**. `scripts/release.py` macht daraus 
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-24
+
 ### Added
 - `RELEASE.md`: Ablauf für Versionierung, Release und Deploy
 - `release/deploy.sh` + `pi/install-release.sh`: Deploy getaggter Versionen auf den Pi mit eigenem
@@ -61,5 +63,6 @@ Keine Änderung an Steuerung, API oder `config.yaml`. Für den neuen Deploy-Abla
 Ausgangsstand vor Einführung von Git (nicht getaggt): Zeitplan, Frostschutz,
 Rückspülung, verriegelter Not-Aus, Web-Dashboard mit Login, MQTT.
 
-[Unreleased]: https://github.com/MarxDimitri/Pool_Controller/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/MarxDimitri/Pool_Controller/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/MarxDimitri/Pool_Controller/releases/tag/v1.2.0
 [1.1.0]: https://github.com/MarxDimitri/Pool_Controller/releases/tag/v1.1.0
