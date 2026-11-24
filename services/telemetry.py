@@ -32,7 +32,7 @@ from typing import Callable, Optional
 logger = logging.getLogger(__name__)
 
 SERVICE_NAME = "pool_marx"
-SERVICE_VERSION = "1.0.0"
+from .version import __version__ as SERVICE_VERSION  # noqa: E402
 EXPORT_TIMEOUT_S = 5.0
 LOG_QUEUE_SIZE = 2048
 LOCAL_WARN_INTERVAL_S = 300.0    # Export-Fehler höchstens alle 5 Min lokal melden

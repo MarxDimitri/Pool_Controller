@@ -22,6 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from services.pump_service import BackwashBusy, EmergencyActive
+from services.version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -183,7 +184,7 @@ def create_app(pump_service, mqtt_service, hardware, api_config: Optional[dict] 
     app = FastAPI(
         title="Pool Marx Steuerung",
         description="Pool Automatisierung",
-        version="1.0.0",
+        version=__version__,
         lifespan=lifespan,
         # Swagger/OpenAPI aus: wäre eine zweite, ungeschützte Bedienoberfläche
         docs_url=None,
@@ -239,6 +240,7 @@ def create_app(pump_service, mqtt_service, hardware, api_config: Optional[dict] 
         pump_state = pump_service.get_state()
         return {
             "timestamp": datetime.now().isoformat(),
+            "version": __version__,
             "pump": pump_state,
             "hardware": hw_state,
             "protection": pump_service.protection_status(),
@@ -389,7 +391,7 @@ def create_app(pump_service, mqtt_service, hardware, api_config: Optional[dict] 
         return {
             "status": "ok",
             "timestamp": datetime.now().isoformat(),
-            "version": "1.0.0"
+            "version": __version__
         }
 
     # ── Web-Dashboard ─────────────────────────────────────────

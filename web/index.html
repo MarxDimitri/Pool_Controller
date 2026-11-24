@@ -281,7 +281,7 @@
   </div>
   </div>
 
-  <footer>Pool Marx Steuerung · <span id="simTag"></span> · <a href="#" id="logoutLink" style="color:inherit;">Abmelden</a></footer>
+  <footer>Pool Marx Steuerung <span id="versionTag"></span> · <span id="simTag"></span> · <a href="#" id="logoutLink" style="color:inherit;">Abmelden</a></footer>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -472,6 +472,7 @@ async function loadInitial(){
     renderPump(status.pump);
     renderHardware(status.hardware);
     renderProtection(status.protection);
+    if(status.version) document.getElementById("versionTag").textContent = "v" + status.version;
     if(status.pool) els.poolMeta && (document.getElementById("poolMeta").textContent =
       `${status.pool.volume_m3} m³ · ${status.pool.name}`);
   }

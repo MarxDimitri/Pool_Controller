@@ -8,6 +8,8 @@ import json
 import logging
 from typing import Optional, Callable
 
+from .version import __version__
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -262,5 +264,5 @@ class MQTTService:
             "name": "Pool Marx",
             "manufacturer": "DIY",
             "model": "Raspberry Pi 4",
-            "sw_version": "1.0.0",
+            "sw_version": __version__,
         }

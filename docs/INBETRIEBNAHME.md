@@ -518,6 +518,12 @@ Neue Einstellungen aus der `config.yaml` im Projekt von Hand in die
 installieren (Kapitel 7.2) und `sudo systemctl daemon-reload` ausführen.
 Offene Browser-Tabs einmal neu laden.
 
+**Welche Version läuft?** Steht im Dashboard unten neben „Pool Marx Steuerung“,
+im Startlog (`Pool Marx Steuerung startet — Version …`) und unter
+`curl -s http://localhost:8080/api/health`. Am besten nur getaggte Releases
+einspielen (`git checkout vX.Y.Z` vor dem Kopieren); Änderungen stehen in
+[CHANGELOG.md](../CHANGELOG.md).
+
 > Hinweis: Jeder Neustart des Dienstes öffnet und schließt kurz das
 > Pumpenrelais (bekannter Punkt in der Roadmap). Solange die Pumpe nicht am
 > Relais angeschlossen ist, hat das keine Wirkung auf die Pumpe.

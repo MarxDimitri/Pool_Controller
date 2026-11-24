@@ -21,6 +21,7 @@ from services.hardware import HardwareController
 from services.pump_service import PumpService
 from services.mqtt_service import MQTTService
 from services.telemetry import setup_telemetry
+from services.version import __version__
 from api.main import create_app
 
 
@@ -131,7 +132,7 @@ async def main() -> int:
     setup_logging(config)
     logger = logging.getLogger("pool_marx")
     logger.info("=" * 50)
-    logger.info("Pool Marx Steuerung startet")
+    logger.info(f"Pool Marx Steuerung startet — Version {__version__}")
     logger.info("=" * 50)
     for key in legacy_secrets:
         logger.warning(

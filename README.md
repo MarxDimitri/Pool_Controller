@@ -84,6 +84,21 @@ POOL_API_SECRET=choose-a-long-password .venv/bin/python main.py
 # dashboard: http://localhost:8080
 ```
 
+## Versions and releases
+
+[Semantic Versioning](https://semver.org/) with annotated Git tags `vX.Y.Z`. The
+single source of truth is [`services/version.py`](services/version.py). API
+(`/api/health`, `/api/status`), dashboard footer, startup log, MQTT discovery and
+telemetry all show this value. Changes are listed in [CHANGELOG.md](CHANGELOG.md).
+
+Release workflow: add entries under `[Unreleased]` in the changelog, then
+
+```bash
+python3 scripts/release.py 1.2.0   # checks, runs tests, bumps version + changelog, commits, tags
+git push origin main v1.2.0
+gh release create v1.2.0 --title "Pool Marx v1.2.0" --notes-from-tag
+```
+
 ## Documentation (German)
 
 - [docs/INBETRIEBNAHME.md](docs/INBETRIEBNAHME.md): installation on the Pi, configuration, calibration, operation, troubleshooting
