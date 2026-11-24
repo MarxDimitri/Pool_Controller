@@ -17,11 +17,22 @@ Neue Einträge kommen unter **[Unreleased]**. `scripts/release.py` macht daraus 
 - `release/deploy.sh` + `pi/install-release.sh`: Deploy getaggter Versionen auf den Pi mit eigenem
   Verzeichnis und venv pro Version, gemeinsamer Config, Health-Check, automatischem Rollback,
   `--rollback`, `--list` und einmaliger Migration (`--migrate`)
+- Kurze README in `pi/` und `release/`, die sagt, wofür das Verzeichnis da ist
 
 ### Changed
 - Verzeichnisse nach Einsatzort benannt: `deploy/` + Pi-Teile aus `scripts/` → **`pi/`**
   (alles, was auf den Pi kommt), restliche `scripts/` → **`release/`** (läuft auf dem Mac).
   Auf dem Pi z. B. jetzt `venv/bin/python pi/mcp4725_set_default_zero.py`.
+- Inbetriebnahme (Kapitel 11): Updates empfohlen über `release/deploy.sh`, manueller Weg nur vor der Migration
+
+### Einmalig beim Update auf dem Pi
+Keine Änderung an Steuerung, API oder `config.yaml`. Für den neuen Deploy-Ablauf
+(siehe RELEASE.md, Abschnitt 5) einmalig:
+1. Mac: `cp release/deploy.env.example .deploy.env` und `POOL_PI=pi@<pi-ip>` eintragen
+2. Pi: `sudo apt install -y python3-venv python3-dev gcc` (jede Version baut ihr eigenes venv)
+3. Mac: `release/deploy.sh --migrate`: bisheriges Verzeichnis → `releases/legacy`,
+   Config → `/opt/pool_marx/shared/config/`
+4. Mac: `release/deploy.sh v1.2.0`
 
 ## [1.1.0] - 2026-11-24
 
