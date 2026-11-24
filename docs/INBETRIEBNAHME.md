@@ -502,6 +502,15 @@ Mosquitto sollte nur auf `127.0.0.1` lauschen und anonyme Zugriffe verbieten.
 
 ## 11. Updates einspielen
 
+> **Empfohlen:** getaggte Versionen mit `scripts/deploy.sh vX.Y.Z` einspielen.
+> Jede Version bekommt ein eigenes Verzeichnis mit eigenem venv, die Umschaltung
+> wird geprüft und bei Fehlern automatisch zurückgerollt
+> (`scripts/deploy.sh --rollback` für den manuellen Weg).
+> Einrichtung und Ablauf: [RELEASE.md](../RELEASE.md), Abschnitt 5. Nach der
+> einmaligen Migration liegt die Config unter `/opt/pool_marx/shared/config/`.
+>
+> Der manuelle Weg unten funktioniert nur **vor** dieser Migration.
+
 ```bash
 # vom Mac aus — config.yaml wird NICHT kopiert
 scp main.py requirements.txt pi@<pi-ip>:/opt/pool_marx/pool_controller/

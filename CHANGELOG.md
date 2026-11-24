@@ -12,6 +12,12 @@ Neue Einträge kommen unter **[Unreleased]**. `scripts/release.py` macht daraus 
 
 ## [Unreleased]
 
+### Added
+- `RELEASE.md`: Ablauf für Versionierung, Release und Deploy
+- `scripts/deploy.sh` + `deploy/install-release.sh`: Deploy getaggter Versionen auf den Pi mit eigenem
+  Verzeichnis und venv pro Version, gemeinsamer Config, Health-Check, automatischem Rollback,
+  `--rollback`, `--list` und einmaliger Migration (`--migrate`)
+
 ## [1.1.0] - 2026-11-24
 
 ### Added

@@ -91,13 +91,7 @@ single source of truth is [`services/version.py`](services/version.py). API
 (`/api/health`, `/api/status`), dashboard footer, startup log, MQTT discovery and
 telemetry all show this value. Changes are listed in [CHANGELOG.md](CHANGELOG.md).
 
-Release workflow: add entries under `[Unreleased]` in the changelog, then
-
-```bash
-python3 scripts/release.py 1.2.0   # checks, runs tests, bumps version + changelog, commits, tags
-git push origin main v1.2.0
-gh release create v1.2.0 --title "Pool Marx v1.2.0" --notes-from-tag
-```
+How to cut and deploy a release: [RELEASE.md](RELEASE.md).
 
 ## Documentation (German)
 
