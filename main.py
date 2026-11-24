@@ -92,7 +92,7 @@ async def systemd_watchdog(pump_service, max_heartbeat_age_s: float = 180):
 
 # Secrets stehen NICHT in config.yaml, sondern kommen aus Umgebungsvariablen.
 # Auf dem Pi setzt systemd sie aus /etc/pool_marx/secrets.env
-# (EnvironmentFile=, nur für root lesbar) — Vorlage: deploy/secrets.env.example
+# (EnvironmentFile=, nur für root lesbar) — Vorlage: pi/secrets.env.example
 SECRET_ENV = {
     ("mqtt", "password"):   "POOL_MQTT_PASSWORD",
     ("api",  "secret_key"): "POOL_API_SECRET",

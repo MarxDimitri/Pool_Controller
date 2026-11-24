@@ -14,9 +14,14 @@ Neue Einträge kommen unter **[Unreleased]**. `scripts/release.py` macht daraus 
 
 ### Added
 - `RELEASE.md`: Ablauf für Versionierung, Release und Deploy
-- `scripts/deploy.sh` + `deploy/install-release.sh`: Deploy getaggter Versionen auf den Pi mit eigenem
+- `release/deploy.sh` + `pi/install-release.sh`: Deploy getaggter Versionen auf den Pi mit eigenem
   Verzeichnis und venv pro Version, gemeinsamer Config, Health-Check, automatischem Rollback,
   `--rollback`, `--list` und einmaliger Migration (`--migrate`)
+
+### Changed
+- Verzeichnisse nach Einsatzort benannt: `deploy/` + Pi-Teile aus `scripts/` → **`pi/`**
+  (alles, was auf den Pi kommt), restliche `scripts/` → **`release/`** (läuft auf dem Mac).
+  Auf dem Pi z. B. jetzt `venv/bin/python pi/mcp4725_set_default_zero.py`.
 
 ## [1.1.0] - 2026-11-24
 

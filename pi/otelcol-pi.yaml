@@ -5,9 +5,9 @@
 # Resource-Detection. Gewählte Variante: otelcol-contrib (siehe docs/telemetry.md).
 #
 # Installation:
-#   sudo install -m 644 scripts/otelcol-pi.yaml /etc/pool_marx/otelcol-pi.yaml
-#   sudo install -m 644 scripts/otelcol-pi.service /etc/systemd/system/otelcol-pi.service
-#   Zugangsdaten in /etc/pool_marx/otelcol.env (chmod 600), siehe deploy/otelcol.env.example
+#   sudo install -m 644 pi/otelcol-pi.yaml /etc/pool_marx/otelcol-pi.yaml
+#   sudo install -m 644 pi/otelcol-pi.service /etc/systemd/system/otelcol-pi.service
+#   Zugangsdaten in /etc/pool_marx/otelcol.env (chmod 600), siehe pi/otelcol.env.example
 #
 # Prüfen:  /usr/bin/otelcol-contrib validate --config /etc/pool_marx/otelcol-pi.yaml
 

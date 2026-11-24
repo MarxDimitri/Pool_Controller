@@ -51,7 +51,8 @@ Weitere Dokumente: [telemetry.md](telemetry.md) (Logs und Metriken nach Elastic)
 | `config/config.yaml` | Einstellungen **ohne** Passwörter |
 | `/etc/pool_marx/secrets.env` | Passwörter (nur auf dem Pi, nur für root lesbar) |
 | `/etc/pool_marx/telemetry.env` | Optional: Endpunkt und API-Key für die Telemetrie |
-| `scripts/` | Einmal-Skript für den MCP4725, Collector-Konfiguration |
+| `pi/` | Alles, was auf den Pi kommt: systemd-/env-Vorlagen, Release-Installer, Einmal-Skript für den MCP4725, Collector-Konfiguration |
+| `release/` | Läuft auf deinem Rechner: Release erstellen, auf den Pi bringen (→ [RELEASE.md](../RELEASE.md)) |
 | `tests/` | Automatische Tests (laufen auf dem Mac, → Kapitel 14) |
 
 **Grundprinzip der Pumpensteuerung:** Die Pumpe wird ausschließlich über das
@@ -149,8 +150,8 @@ das EEPROM verträgt nur begrenzt viele Schreibzyklen.
 ```bash
 cd /opt/pool_marx/pool_controller
 sudo systemctl stop pool_marx                                   # falls schon eingerichtet
-venv/bin/python scripts/mcp4725_set_default_zero.py --check     # nur lesen
-venv/bin/python scripts/mcp4725_set_default_zero.py --yes       # schreiben
+venv/bin/python pi/mcp4725_set_default_zero.py --check     # nur lesen
+venv/bin/python pi/mcp4725_set_default_zero.py --yes       # schreiben
 sudo systemctl start pool_marx
 ```
 
@@ -166,7 +167,7 @@ Installationsort: `/opt/pool_marx/pool_controller`
 ```bash
 # vom Mac aus (im Projektordner):
 ssh pi@<pi-ip> "sudo install -d -o pi -g pi /opt/pool_marx/pool_controller"
-scp -r main.py requirements.txt api services web config deploy scripts \
+scp -r main.py requirements.txt api services web config pi \
   pi@<pi-ip>:/opt/pool_marx/pool_controller/
 
 # auf dem Pi:
@@ -196,7 +197,7 @@ Passwörter stehen **nicht** in `config.yaml`, sondern als Umgebungsvariablen in
 die Werte an den Dienst.
 
 ```bash
-cd /opt/pool_marx/pool_controller/deploy
+cd /opt/pool_marx/pool_controller/pi
 sudo install -d -m 700 /etc/pool_marx
 sudo install -m 600 -o root -g root secrets.env.example /etc/pool_marx/secrets.env
 sudo nano /etc/pool_marx/secrets.env
@@ -216,7 +217,7 @@ Nur nötig, wenn Logs und Metriken nach Elastic gehen sollen (→ [telemetry.md]
 Fehlt die Datei, startet der Dienst trotzdem.
 
 ```bash
-cd /opt/pool_marx/pool_controller/deploy
+cd /opt/pool_marx/pool_controller/pi
 sudo install -m 600 -o root -g root telemetry.env.example /etc/pool_marx/telemetry.env
 sudo nano /etc/pool_marx/telemetry.env
 ```
@@ -291,7 +292,7 @@ WantedBy=multi-user.target
 ### 7.2 Ergänzung für Secrets und Watchdog
 
 ```bash
-cd /opt/pool_marx/pool_controller/deploy
+cd /opt/pool_marx/pool_controller/pi
 sudo install -D -m 644 pool_marx.override.conf \
   /etc/systemd/system/pool_marx.service.d/override.conf
 sudo systemctl daemon-reload
@@ -502,10 +503,10 @@ Mosquitto sollte nur auf `127.0.0.1` lauschen und anonyme Zugriffe verbieten.
 
 ## 11. Updates einspielen
 
-> **Empfohlen:** getaggte Versionen mit `scripts/deploy.sh vX.Y.Z` einspielen.
+> **Empfohlen:** getaggte Versionen mit `release/deploy.sh vX.Y.Z` einspielen.
 > Jede Version bekommt ein eigenes Verzeichnis mit eigenem venv, die Umschaltung
 > wird geprüft und bei Fehlern automatisch zurückgerollt
-> (`scripts/deploy.sh --rollback` für den manuellen Weg).
+> (`release/deploy.sh --rollback` für den manuellen Weg).
 > Einrichtung und Ablauf: [RELEASE.md](../RELEASE.md), Abschnitt 5. Nach der
 > einmaligen Migration liegt die Config unter `/opt/pool_marx/shared/config/`.
 >
@@ -514,7 +515,7 @@ Mosquitto sollte nur auf `127.0.0.1` lauschen und anonyme Zugriffe verbieten.
 ```bash
 # vom Mac aus — config.yaml wird NICHT kopiert
 scp main.py requirements.txt pi@<pi-ip>:/opt/pool_marx/pool_controller/
-scp -r api services web deploy scripts pi@<pi-ip>:/opt/pool_marx/pool_controller/
+scp -r api services web pi pi@<pi-ip>:/opt/pool_marx/pool_controller/
 ssh pi@<pi-ip> "sudo systemctl restart pool_marx"
 ```
 
@@ -523,7 +524,7 @@ Bei geänderten Abhängigkeiten zusätzlich auf dem Pi:
 
 Neue Einstellungen aus der `config.yaml` im Projekt von Hand in die
 `config.yaml` auf dem Pi übernehmen, also nur neue Blöcke ergänzen, nichts
-überschreiben. Bei Änderungen an `deploy/pool_marx.override.conf` diese neu
+überschreiben. Bei Änderungen an `pi/pool_marx.override.conf` diese neu
 installieren (Kapitel 7.2) und `sudo systemctl daemon-reload` ausführen.
 Offene Browser-Tabs einmal neu laden.
 

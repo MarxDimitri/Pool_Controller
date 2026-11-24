@@ -2,7 +2,7 @@
 Pool Marx — Telemetrie (OpenTelemetry Logs + Metriken, Export per OTLP/HTTP)
 
 Herstellerneutral: Standard-OpenTelemetry-SDK, Ziel z. B. Elastic Observability
-(direkt oder über einen lokalen Collector, siehe scripts/otelcol-pi.yaml).
+(direkt oder über einen lokalen Collector, siehe pi/otelcol-pi.yaml).
 
 Wichtigste Regel: Telemetrie darf die Pumpensteuerung nie stören.
 - Exporte laufen nur in den Hintergrund-Threads des SDK (BatchLogRecordProcessor,

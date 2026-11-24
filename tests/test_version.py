@@ -16,7 +16,7 @@ from tests.conftest import API_SECRET, AUTH, ROOT, FlakyBus, RecordingGPIO
 
 
 def load_release():
-    spec = importlib.util.spec_from_file_location("release", ROOT / "scripts" / "release.py")
+    spec = importlib.util.spec_from_file_location("release", ROOT / "release" / "release.py")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod

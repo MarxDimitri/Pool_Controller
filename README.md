@@ -62,11 +62,18 @@ main.py
 
 - Secrets (dashboard password, MQTT password, telemetry API key) come from
   environment variables (systemd `EnvironmentFile`), never from `config.yaml`.
-  Templates are in [`deploy/`](deploy/).
+  Templates are in [`pi/`](pi/).
 - Deployed as a systemd service with a watchdog. If a background task crashes,
   the process exits and systemd restarts it.
-- `scripts/` contains a one-off tool that sets the MCP4725 power-on value to 0 V,
-  plus an OpenTelemetry Collector config for the Pi.
+
+Two folders hold everything outside the application code, named after where
+their content runs:
+
+- [`pi/`](pi/): everything that goes onto the Raspberry Pi: systemd and env
+  templates, the release installer, the MCP4725 one-off tool, the OpenTelemetry
+  Collector config.
+- [`release/`](release/): what you run on your own computer to cut a release and
+  deploy it to the Pi.
 
 ## Quick start (simulation, no Pi needed)
 

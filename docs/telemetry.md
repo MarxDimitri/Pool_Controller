@@ -15,7 +15,7 @@ pool_marx ──OTLP/HTTP──► (optional) otelcol-pi @127.0.0.1:4318 ──�
    `https://<projekt>.ingest.<region>.elastic.cloud:443`.
 2. Über denselben Assistenten oder **Stack Management → API keys** einen API-Key
    erzeugen, nur mit Ingest-Rechten. Den Base64-Wert („Encoded“) notieren.
-3. Ohne Collector: `/etc/pool_marx/telemetry.env` (Vorlage `deploy/telemetry.env.example`):
+3. Ohne Collector: `/etc/pool_marx/telemetry.env` (Vorlage `pi/telemetry.env.example`):
    ```
    OTEL_EXPORTER_OTLP_ENDPOINT=https://<projekt>.ingest.<region>.elastic.cloud:443
    OTEL_EXPORTER_OTLP_HEADERS=Authorization=ApiKey%20<encoded-key>
@@ -109,9 +109,9 @@ Installation (Version anpassen, Release-Seite von `opentelemetry-collector-relea
 wget https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v<VER>/otelcol-contrib_<VER>_linux_arm64.deb
 sudo dpkg -i otelcol-contrib_<VER>_linux_arm64.deb
 sudo systemctl disable --now otelcol-contrib            # Standarddienst aus
-sudo install -m 644 scripts/otelcol-pi.yaml /etc/pool_marx/otelcol-pi.yaml
-sudo install -m 600 deploy/otelcol.env.example /etc/pool_marx/otelcol.env   # dann Werte eintragen
-sudo install -m 644 scripts/otelcol-pi.service /etc/systemd/system/
+sudo install -m 644 pi/otelcol-pi.yaml /etc/pool_marx/otelcol-pi.yaml
+sudo install -m 600 pi/otelcol.env.example /etc/pool_marx/otelcol.env   # dann Werte eintragen
+sudo install -m 644 pi/otelcol-pi.service /etc/systemd/system/
 otelcol-contrib validate --config /etc/pool_marx/otelcol-pi.yaml
 sudo systemctl daemon-reload && sudo systemctl enable --now otelcol-pi
 curl -s http://127.0.0.1:13133/   # Health-Check

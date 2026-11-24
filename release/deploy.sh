@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Pool Marx — getaggte Version auf den Raspberry Pi bringen (vom Mac aus)
 #
-#   scripts/deploy.sh v1.2.0      Version installieren, umschalten, prüfen (Auto-Rollback bei Fehler)
-#   scripts/deploy.sh --rollback  zur vorherigen Version zurück
-#   scripts/deploy.sh --list      installierte Versionen auf dem Pi anzeigen
-#   scripts/deploy.sh --migrate   einmalig: Pi auf die Release-Struktur umstellen
+#   release/deploy.sh v1.2.0      Version installieren, umschalten, prüfen (Auto-Rollback bei Fehler)
+#   release/deploy.sh --rollback  zur vorherigen Version zurück
+#   release/deploy.sh --list      installierte Versionen auf dem Pi anzeigen
+#   release/deploy.sh --migrate   einmalig: Pi auf die Release-Struktur umstellen
 #
 # Ziel-Pi aus .deploy.env im Projektordner (nicht im Repo), z. B.:
 #   POOL_PI=pi@<pi-ip>
-# Vorlage: deploy/deploy.env.example
+# Vorlage: release/deploy.env.example
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -16,11 +16,12 @@ die() { printf 'FEHLER: %s\n' "$*" >&2; exit 1; }
 
 # shellcheck disable=SC1091
 [ -f "$ROOT/.deploy.env" ] && source "$ROOT/.deploy.env"
-[ -n "${POOL_PI:-}" ] || die "POOL_PI nicht gesetzt — .deploy.env anlegen (Vorlage: deploy/deploy.env.example)"
+[ -n "${POOL_PI:-}" ] || die "POOL_PI nicht gesetzt — .deploy.env anlegen (Vorlage: release/deploy.env.example)"
 
-INSTALLER_LOCAL="$ROOT/deploy/install-release.sh"
+INSTALLER_LOCAL="$ROOT/pi/install-release.sh"
 INSTALLER_REMOTE="/tmp/pool_marx-install-release.sh"
-PATHS=(main.py requirements.txt api services web deploy scripts config)
+# pi/ ab v1.2; ältere Tags haben stattdessen deploy/ und scripts/
+CANDIDATES=(main.py requirements.txt api services web config pi deploy scripts)
 
 # Installer immer aus dem aktuellen Arbeitsstand (funktioniert auch für ältere Tags)
 push_installer() { scp -q "$INSTALLER_LOCAL" "$POOL_PI:$INSTALLER_REMOTE"; }
@@ -37,6 +38,10 @@ case "${1:-}" in
       echo "WARNUNG: $TAG ist noch nicht auf GitHub gepusht."
       read -r -p "Trotzdem deployen? [j/N] " a; [ "$a" = "j" ] || exit 1
     fi
+    PATHS=()
+    for p in "${CANDIDATES[@]}"; do
+      git -C "$ROOT" cat-file -e "$TAG:$p" 2>/dev/null && PATHS+=("$p")
+    done
     TARBALL="/tmp/pool_marx-$TAG.tar"
     echo "==> Übertrage $TAG nach $POOL_PI"
     git -C "$ROOT" archive --format=tar "$TAG" "${PATHS[@]}" | ssh "$POOL_PI" "cat > $TARBALL"

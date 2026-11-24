@@ -1,4 +1,4 @@
-"""scripts/mcp4725_set_default_zero.py mit simuliertem smbus2"""
+"""pi/mcp4725_set_default_zero.py mit simuliertem smbus2"""
 
 import importlib.util
 import sys
@@ -49,7 +49,7 @@ def make_smbus(chip):
 
 
 def load_script():
-    spec = importlib.util.spec_from_file_location("eeprom_script", ROOT / "scripts" / "mcp4725_set_default_zero.py")
+    spec = importlib.util.spec_from_file_location("eeprom_script", ROOT / "pi" / "mcp4725_set_default_zero.py")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod

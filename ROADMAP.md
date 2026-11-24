@@ -108,7 +108,7 @@ ein, bis der Dienst läuft (~20–40s; nach jedem Boot/Stromausfall).
 - Secrets standen früher im Klartext in Doku und Config.
 - [x] Passwort aus `PROJECT_DESCRIPTION.md` entfernen
 - [ ] Zugangsdaten rotieren, die früher im Klartext lagen [Pi]
-- [x] Secrets aus `config.yaml` entfernt → Umgebungsvariablen `POOL_API_SECRET`, `POOL_MQTT_PASSWORD` (systemd `EnvironmentFile=/etc/pool_marx/secrets.env`, Vorlagen in `deploy/`)
+- [x] Secrets aus `config.yaml` entfernt → Umgebungsvariablen `POOL_API_SECRET`, `POOL_MQTT_PASSWORD` (systemd `EnvironmentFile=/etc/pool_marx/secrets.env`, Vorlagen in `pi/`)
 - [ ] Auf dem Pi: `secrets.env` anlegen, Secrets aus der dortigen `config.yaml` löschen [Pi]
 - [x] Telemetrie-Zugangsdaten nur in `/etc/pool_marx/telemetry.env` (`EnvironmentFile=-`), nie in `config.yaml` oder Logs (per Test geprüft)
 - [x] ~~`chmod 600 config/config.yaml`~~ — entfällt, `config.yaml` enthält keine Secrets mehr
@@ -121,7 +121,7 @@ ein, bis der Dienst läuft (~20–40s; nach jedem Boot/Stromausfall).
 
 ### 🟡 MCP4725 Power-on-Wert
 - DAC lädt nach Stromausfall seinen EEPROM-Wert, bevor die Software läuft.
-- [x] Einmal-Skript `scripts/mcp4725_set_default_zero.py` (mit `--check` zum Auslesen)
+- [x] Einmal-Skript `pi/mcp4725_set_default_zero.py` (mit `--check` zum Auslesen)
 - [ ] Auf dem Pi ausführen und nach Stromunterbrechung 0 V messen [Pi] ([abnahme.md](docs/abnahme.md) C2)
 
 ### 🟡 Inkonsistente Zustände

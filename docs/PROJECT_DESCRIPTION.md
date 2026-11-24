@@ -48,8 +48,10 @@ Die Pumpe ist derzeit **nicht** am Pumpenrelais angeschlossen (Stand 2026-11-22)
   OTLP/HTTP (Ziel Elastic), standardmäßig aus
 - `services/events.py` — strukturierte Log-Ereignisse (`event.name`)
 - `web/index.html` — Dashboard (inkl. Istwert und Button „Pumpenfehler notieren“)
-- `scripts/` — `mcp4725_set_default_zero.py` (einmalig: EEPROM-Startwert 0 V),
+- `pi/` — alles, was auf den Pi kommt: systemd-/env-Vorlagen, `install-release.sh`,
+  `mcp4725_set_default_zero.py` (einmalig: EEPROM-Startwert 0 V),
   `otelcol-pi.yaml`/`.service` (optionaler Collector)
+- `release/` — läuft auf dem Mac: `release.py` (Release erstellen), `deploy.sh` (auf den Pi bringen)
 - `tests/` — pytest-Suite im Simulationsmodus (Stufe A/B), `pytest -q`
 - `docs/` — Inbetriebnahme, Telemetrie, Abnahme (Stufe C); das Netzwerkkonzept
   liegt nur lokal (`docs/NETZWERK_SICHERHEIT.md`, nicht im öffentlichen Repo)
@@ -62,12 +64,12 @@ Die Pumpe ist derzeit **nicht** am Pumpenrelais angeschlossen (Stand 2026-11-22)
   Frostschutz-Parameter, MQTT-Broker (127.0.0.1). **Keine Secrets** —
   MQTT-Passwort und Dashboard-Passwort kommen aus Umgebungsvariablen
   (`POOL_MQTT_PASSWORD`, `POOL_API_SECRET`), auf dem Pi per systemd aus
-  `/etc/pool_marx/secrets.env` (Vorlage: `deploy/secrets.env.example`).
+  `/etc/pool_marx/secrets.env` (Vorlage: `pi/secrets.env.example`).
   Telemetrie-Zugangsdaten analog in `/etc/pool_marx/telemetry.env`
-  (Vorlage: `deploy/telemetry.env.example`, optional).
+  (Vorlage: `pi/telemetry.env.example`, optional).
   Neue Abschnitte: `dac`, `pump.min_speed`, `telemetry`.
 - Deployed als systemd-Service `pool_marx.service` (Restart=always),
-  Ergänzung in `deploy/pool_marx.override.conf`
+  Ergänzung in `pi/pool_marx.override.conf`
 
 Läuft aktuell stabil im Simulationsmodus getestet und im Realbetrieb
 verifiziert (Pumpe reagiert hörbar auf `speed_pct`-Kommandos via REST API).
@@ -125,7 +127,7 @@ als tar.gz übertragen und per `scp` auf den Pi kopiert. Pi erreichbar unter
 nutzen), User `pi`. Nach jeder Änderung:
 ```bash
 scp main.py requirements.txt pi@<pi-ip>:/opt/pool_marx/pool_controller/
-scp -r api services web deploy scripts pi@<pi-ip>:/opt/pool_marx/pool_controller/
+scp -r api services web pi pi@<pi-ip>:/opt/pool_marx/pool_controller/
 ssh pi@<pi-ip> "sudo systemctl restart pool_marx"
 ```
 Bei geänderter `requirements.txt` vorher `venv/bin/pip install -r requirements.txt`

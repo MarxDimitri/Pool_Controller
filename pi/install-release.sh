@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Pool Marx — Release auf dem Raspberry Pi installieren / umschalten
 #
-# Wird normalerweise vom Mac aus über scripts/deploy.sh aufgerufen.
+# Wird normalerweise vom Mac aus über release/deploy.sh aufgerufen.
 #
 #   install-release.sh install <tag> <tarball>   neue Version installieren und aktivieren
 #   install-release.sh rollback                  zur vorherigen Version zurück
@@ -118,9 +118,10 @@ EOF
 }
 
 check_override() {
-  local new="$RELEASES/$1/deploy/pool_marx.override.conf"
+  local new="$RELEASES/$1/pi/pool_marx.override.conf"
+  [ -f "$new" ] || new="$RELEASES/$1/deploy/pool_marx.override.conf"   # Tags vor v1.2
   if [ -f "$new" ] && [ -f "$OVERRIDE" ] && ! cmp -s "$new" "$OVERRIDE"; then
-    warn "deploy/pool_marx.override.conf weicht von $OVERRIDE ab. Bei Bedarf übernehmen:"
+    warn "pi/pool_marx.override.conf weicht von $OVERRIDE ab. Bei Bedarf übernehmen:"
     echo "  sudo install -m 644 $new $OVERRIDE && sudo systemctl daemon-reload && sudo systemctl restart $SERVICE"
   fi
 }
@@ -232,7 +233,7 @@ cmd_migrate() {
   # zeigt über den Symlink weiterhin auf genau dieses venv
   set_link "$CURRENT" "releases/legacy"
   if restart_and_check legacy; then
-    log "Migration fertig. Nächster Schritt: scripts/deploy.sh vX.Y.Z"
+    log "Migration fertig. Nächster Schritt: release/deploy.sh vX.Y.Z"
   else
     die "Dienst startet nach der Migration nicht — journalctl -u $SERVICE -n 100"
   fi

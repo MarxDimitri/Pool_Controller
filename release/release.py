@@ -2,8 +2,8 @@
 """
 Pool Marx — Release erstellen (lokal, ohne Push)
 
-    python3 scripts/release.py 1.2.0           # Release vorbereiten, committen, taggen
-    python3 scripts/release.py 1.2.0 --dry-run # nur prüfen und anzeigen
+    python3 release/release.py 1.2.0           # Release vorbereiten, committen, taggen
+    python3 release/release.py 1.2.0 --dry-run # nur prüfen und anzeigen
 
 Ablauf:
   1. Prüft: Versionsformat X.Y.Z, größer als die aktuelle, Branch main,

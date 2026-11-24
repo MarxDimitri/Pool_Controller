@@ -12,11 +12,11 @@ Schreibzyklen (typ. 1 Mio.). Ein einziger Aufruf genügt.
 
 Ausführen auf dem Pi:
     sudo systemctl stop pool_marx          # empfohlen, damit nichts dazwischenfunkt
-    /opt/pool_marx/pool_controller/venv/bin/python scripts/mcp4725_set_default_zero.py --yes
+    /opt/pool_marx/pool_controller/venv/bin/python pi/mcp4725_set_default_zero.py --yes
     sudo systemctl start pool_marx
 
 Nur lesen (kein Schreiben):
-    /opt/pool_marx/pool_controller/venv/bin/python scripts/mcp4725_set_default_zero.py --check
+    /opt/pool_marx/pool_controller/venv/bin/python pi/mcp4725_set_default_zero.py --check
 
 Ergebnis prüfen:
     1. Das Skript liest das EEPROM zurück und meldet "EEPROM = 0".

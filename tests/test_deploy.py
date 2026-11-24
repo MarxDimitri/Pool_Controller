@@ -1,5 +1,5 @@
 """
-deploy/install-release.sh — echter Ablauf in einem Temp-Verzeichnis.
+pi/install-release.sh — echter Ablauf in einem Temp-Verzeichnis.
 
 Statt systemd startet ein Fake-systemctl einen Mini-HTTP-Server, der unter
 /api/health die Version der aktiven Release meldet (Release mit Datei BROKEN
@@ -19,7 +19,7 @@ import pytest
 from tests.conftest import ROOT
 
 pytestmark = pytest.mark.stage_b
-SCRIPT = ROOT / "deploy" / "install-release.sh"
+SCRIPT = ROOT / "pi" / "install-release.sh"
 
 FAKE_SERVER = textwrap.dedent("""
     import http.server, json, os, re, sys
@@ -65,7 +65,7 @@ def pi(tmp_path):
     (state / "server.py").write_text(FAKE_SERVER)
     ctl = state / "systemctl"; ctl.write_text(FAKE_CTL); ctl.chmod(0o755)
     override = tmp_path / "override.conf"
-    override.write_text((ROOT / "deploy" / "pool_marx.override.conf").read_text())
+    override.write_text((ROOT / "pi" / "pool_marx.override.conf").read_text())
     env = {**os.environ, "POOL_BASE": str(base), "POOL_SYSTEMCTL": str(ctl), "FAKE_STATE": str(state),
            "POOL_HEALTH_PORT": str(free_port()), "POOL_HEALTH_TIMEOUT": "8",
            "POOL_SKIP_PIP": "1", "POOL_OVERRIDE_PATH": str(override),
@@ -90,7 +90,7 @@ def pi(tmp_path):
             "main.py": "# neu\n", "requirements.txt": "pyyaml\n",
             "services/version.py": f'__version__ = "{version}"\n',
             "config/config.yaml": "pump:\n  speeds: {min: 20}\n  min_speed: {mode: winter}\napi:\n  port: 8080\n" + extra_cfg,
-            "deploy/pool_marx.override.conf": override.read_text(),
+            "pi/pool_marx.override.conf": override.read_text(),
         }
         if broken:
             files["BROKEN"] = "x"

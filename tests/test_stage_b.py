@@ -261,10 +261,10 @@ def test_b3_restart_mid_backwash_safe_state(config):
 # ── B4 systemd (statisch prüfbar) ─────────────────────────────
 
 def test_b4_unit_override_and_env_template():
-    override = (ROOT / "deploy" / "pool_marx.override.conf").read_text()
+    override = (ROOT / "pi" / "pool_marx.override.conf").read_text()
     assert "EnvironmentFile=-/etc/pool_marx/telemetry.env" in override
     assert "EnvironmentFile=/etc/pool_marx/secrets.env" in override
-    example = (ROOT / "deploy" / "telemetry.env.example").read_text()
+    example = (ROOT / "pi" / "telemetry.env.example").read_text()
     for line in example.splitlines():
         if line.startswith("OTEL_") and "=" in line:
             assert "<" not in line or line.startswith("#")

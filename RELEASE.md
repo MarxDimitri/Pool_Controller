@@ -36,11 +36,11 @@ gh auth login -h github.com --web                                        # GitHu
 
 ```bash
 git switch main && git pull
-python3 scripts/release.py 1.2.0 --dry-run   # shows the changelog entries that will ship
-python3 scripts/release.py 1.2.0
+python3 release/release.py 1.2.0 --dry-run   # shows the changelog entries that will ship
+python3 release/release.py 1.2.0
 ```
 
-The script ([scripts/release.py](scripts/release.py)):
+The script ([release/release.py](release/release.py)):
 
 1. **Refuses** to run if:
    - the version is not `X.Y.Z` or not higher than the current one
@@ -85,7 +85,7 @@ The last 3 versions are kept. The active and the previous version are never dele
 
 1. Mac: create `.deploy.env` (not committed):
    ```bash
-   cp deploy/deploy.env.example .deploy.env    # set POOL_PI=pi@<pi-ip>
+   cp release/deploy.env.example .deploy.env    # set POOL_PI=pi@<pi-ip>
    ```
 2. Pi: build tools for `RPi.GPIO` (each version gets a fresh venv):
    ```bash
@@ -94,17 +94,17 @@ The last 3 versions are kept. The active and the previous version are never dele
 3. Convert the existing installation into the layout above. The current
    directory becomes `releases/legacy`, the config moves to `shared/config`:
    ```bash
-   scripts/deploy.sh --migrate
+   release/deploy.sh --migrate
    ```
 
 ### Deploy
 
 ```bash
-scripts/deploy.sh v1.2.0
+release/deploy.sh v1.2.0
 ```
 
-What happens ([scripts/deploy.sh](scripts/deploy.sh) on the Mac,
-[deploy/install-release.sh](deploy/install-release.sh) on the Pi):
+What happens ([release/deploy.sh](release/deploy.sh) on the Mac,
+[pi/install-release.sh](pi/install-release.sh) on the Pi):
 
 1. `git archive` of the tag is copied to the Pi. Your working tree is not touched.
    The deploy asks before deploying a tag that is not pushed yet.
@@ -115,7 +115,7 @@ What happens ([scripts/deploy.sh](scripts/deploy.sh) on the Mac,
 4. Checks:
    - warns if `shared/config/config.yaml` lacks sections the new version knows
      (defaults apply; add them by hand)
-   - warns if `deploy/pool_marx.override.conf` differs from the installed one
+   - warns if `pi/pool_marx.override.conf` differs from the installed one
 5. Switch `pool_controller` to the new version (atomic symlink), restart the service.
 6. Health check: the service must be active and `/api/health` must report the new
    version within 60 s. **Otherwise it rolls back automatically** to the previous version.
@@ -125,8 +125,8 @@ The sudo password for `systemctl` may be asked for.
 ### Rollback and overview
 
 ```bash
-scripts/deploy.sh --rollback   # switch back to the previous version (and restart)
-scripts/deploy.sh --list       # installed versions, active and previous marked
+release/deploy.sh --rollback   # switch back to the previous version (and restart)
+release/deploy.sh --list       # installed versions, active and previous marked
 ```
 
 Rolling back keeps the config as it is. Older versions ignore config keys they
@@ -145,7 +145,7 @@ do not know.
 
 - [ ] All changes have changelog entries under `[Unreleased]`
 - [ ] Version bump matches the changes (section 1)
-- [ ] `scripts/release.py X.Y.Z` succeeded (tests green)
+- [ ] `release/release.py X.Y.Z` succeeded (tests green)
 - [ ] `git show vX.Y.Z` reviewed
 - [ ] Pushed `main` and the tag, GitHub release created
-- [ ] `scripts/deploy.sh vX.Y.Z` succeeded, no config warnings left, dashboard footer shows the new version
+- [ ] `release/deploy.sh vX.Y.Z` succeeded, no config warnings left, dashboard footer shows the new version

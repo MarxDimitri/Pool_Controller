@@ -4,7 +4,7 @@
 # und den Benutzer "otelcol-contrib" mit). Den mitgelieferten Standarddienst abschalten:
 #   sudo systemctl disable --now otelcol-contrib
 # Dann:
-#   sudo install -m 644 scripts/otelcol-pi.service /etc/systemd/system/otelcol-pi.service
+#   sudo install -m 644 pi/otelcol-pi.service /etc/systemd/system/otelcol-pi.service
 #   sudo systemctl daemon-reload && sudo systemctl enable --now otelcol-pi
 #   journalctl -u otelcol-pi -f
 

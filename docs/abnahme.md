@@ -33,7 +33,7 @@ Erwartete Anzeige an der Pumpe (sie zeigt erst bei ≈ 10,13 V 100 %):
 
 ## C2 — Reset-Test (EEPROM-Startwert)
 
-Vorher einmalig: `scripts/mcp4725_set_default_zero.py --yes`. Ausgabe muss „EEPROM = 0“ zeigen.
+Vorher einmalig: `pi/mcp4725_set_default_zero.py --yes`. Ausgabe muss „EEPROM = 0“ zeigen.
 
 | Test | Ausgang beim Einschalten | Ausgang nach Dienststart | OK |
 |---|---|---|---|
