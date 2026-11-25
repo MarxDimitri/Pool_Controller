@@ -71,6 +71,7 @@ telegram:
   notify_level: WARNING
   notify_events: [frost.deactivated, backwash.finished, pump.mains_restore]
   notify_startup: true
+  notify_state_changes: true
   commands_enabled: true
   manual_duration_min: 120
   max_command_age_s: 120
@@ -86,15 +87,28 @@ telegram:
 | `notify_level` | Alle Log-Meldungen ab dieser Stufe werden gemeldet (`WARNING`: Frostschutz an, Abschaltung, Fehlernotiz, DAC-Fehler …) |
 | `notify_events` | Zusätzlich diese Ereignisse, auch wenn sie nur INFO sind |
 | `notify_startup` | Meldung mit Status bei jedem Start; beim Beenden kommt `⏹ Pool Marx wird beendet` |
+| `notify_state_changes` | `true` = jede Zustandsänderung melden: Pumpe % (mit Grund), Licht an/aus, Rückspülung Start/Ende. Ohne Ton, mit `/stumm` abschaltbar. Standard `false` |
 | `commands_enabled` | `false` = nur `/status` und `/hilfe` |
 | `manual_duration_min` | `/pumpe` und `/aus` gelten so lange, danach übernimmt wieder der Zeitplan. So bleibt ein vergessener Befehl nicht wochenlang aktiv. `0` = unbegrenzt |
 | `max_command_age_s` | Ältere Befehle werden verworfen, z. B. wenn der Pi offline war und Telegram sie nachliefert |
 | `confirm_timeout_s` | So lange gilt der Bestätigungsknopf bei `/rueckspuelen` und `/abschalten` |
 | `max_messages_per_min` | Mehr Meldungen werden gesammelt und gebündelt verschickt |
-| `repeat_suppress_min` | Gleiche Meldung (z. B. MQTT-Reconnect alle 10 s) höchstens so oft; danach mit „… × wiederholt“ |
+| `repeat_suppress_min` | Gleiche Warnung/Fehlermeldung (z. B. MQTT-Reconnect alle 10 s) höchstens so oft; danach mit „… × wiederholt“. Gilt nicht für Zustandsänderungen. |
 
 Fehlt der Abschnitt, ist der Bot aus. Dann `sudo systemctl restart pool_marx`.
 Im Log muss erscheinen: `Telegram aktiv: Bot @…, 1 Nutzer freigegeben, Befehle an`.
+
+### Mit Ton oder ohne
+
+| Art | Beispiele | Ton | `/stumm` |
+|---|---|---|---|
+| Warnungen und Fehler (ab `notify_level`, mindestens WARNING) | Frostschutz aktiv, Abschaltung, DAC-Fehler, Fehlernotiz, fremder Nutzer | ja | wirkt nicht |
+| Zustandsänderungen (`notify_state_changes: true`) | `🌀 07:00:00 Pumpe 20 → 60 % (Zeitplan „Morgenfilterung“)`, `💡 Licht an`, `🔄 Rückspülung fertig nach 212 s` | nein | stumm |
+| Weitere Ereignisse (`notify_events`) | Frostschutz aus, Netz wieder an | nein | stumm |
+| Start / Beenden des Dienstes | `✅ Pool Marx … gestartet` | ja | wirkt nicht |
+
+Kommen eine laute und eine leise Meldung in derselben Nachricht an, klingelt
+die Nachricht. Zustandsänderungen setzen `logging.level: INFO` voraus (Standard).
 
 ## 5. Befehle
 
@@ -109,7 +123,13 @@ Im Log muss erscheinen: `Telegram aktiv: Bot @…, 1 Nutzer freigegeben, Befehle
 | `/rueckspuelen` | Rückspülung, **nach Bestätigung** per Knopf |
 | `/abschalten` | Alles abschalten und verriegeln (wie im Dashboard), **nach Bestätigung** |
 | `/notiz E-04` | Pumpenfehler mit aktuellem Status ins Log (wie im Dashboard) |
+| `/stumm` | Leise Meldungen aus, bis `/laut`. Warnungen und Fehler kommen weiter. |
+| `/stumm 3` | Leise Meldungen für 3 Stunden aus (1–168), danach automatisch wieder an |
+| `/laut` | Leise Meldungen wieder an, mit Anzahl der unterdrückten |
 | `/hilfe` | Befehlsübersicht |
+
+`/stumm`, `/laut`, `/status` und `/hilfe` gehen auch mit `commands_enabled: false`.
+Stumm gilt für alle Nutzer und bis zum nächsten Neustart des Dienstes.
 
 Es gelten dieselben Regeln wie im Dashboard: Der Frostschutz hat Vorrang, bei
 aktiver Abschaltung wird alles abgelehnt, und während einer Rückspülung gibt

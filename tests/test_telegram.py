@@ -145,16 +145,30 @@ def test_token_comes_from_environment(monkeypatch):
 
 # ── Log-Auswahl ───────────────────────────────────────────────
 
-def _record(name, level, msg_text, event=None):
+def _record(name, level, msg_text, event=None, **attrs):
     rec = logging.LogRecord(name, level, __file__, 1, msg_text, None, None)
     if event:
         setattr(rec, "event.name", event)
+    for key, value in attrs.items():
+        setattr(rec, key.replace("__", "."), value)
     return rec
 
 
+class Collect(list):
+    """submit()-Double: sammelt Texte, merkt sich leise/laut."""
+
+    def __init__(self):
+        super().__init__()
+        self.silent = []
+
+    def __call__(self, text, silent=False):
+        self.append(text)
+        self.silent.append(silent)
+
+
 def test_handler_selects_by_level_and_event():
-    out = []
-    h = TelegramNotifyHandler(logging.WARNING, ["backwash.finished"], out.append)
+    out = Collect()
+    h = TelegramNotifyHandler(logging.WARNING, ["backwash.finished"], out)
     h.handle(_record("services.pump_service", logging.WARNING, "NOT-AUS verriegelt"))
     h.handle(_record("services.pump_service", logging.INFO, "Zeitplanwechsel",
                      "schedule.transition"))
@@ -163,12 +177,13 @@ def test_handler_selects_by_level_and_event():
     h.handle(_record("services.hardware", logging.ERROR, "DAC Schreibfehler"))
     assert len(out) == 3
     assert out[0].startswith("⚠️") and "NOT-AUS" in out[0]
-    assert out[1].startswith("ℹ️") and out[2].startswith("🔴")
+    assert out[1].startswith("🔄") and out[2].startswith("🔴")
+    assert out.silent == [False, True, False]             # nur Warnungen/Fehler mit Ton
 
 
 def test_handler_excludes_own_transport_and_http_libraries():
-    out = []
-    h = TelegramNotifyHandler(logging.INFO, [], out.append)
+    out = Collect()
+    h = TelegramNotifyHandler(logging.INFO, [], out)
     for name in ("services.telegram_service", "httpx", "httpcore.connection"):
         h.handle(_record(name, logging.ERROR, "Telegram nicht erreichbar"))
     h.handle(_record("pool_marx.telegram", logging.WARNING, "fremder Nutzer"))
@@ -176,20 +191,20 @@ def test_handler_excludes_own_transport_and_http_libraries():
 
 
 def test_handler_redacts_token_and_never_raises():
-    out = []
-    h = TelegramNotifyHandler(logging.WARNING, [], out.append,
+    out = Collect()
+    h = TelegramNotifyHandler(logging.WARNING, [], out,
                               redact=lambda s: s.replace(TOKEN, "***"))
     h.handle(_record("x", logging.WARNING, f"url .../bot{TOKEN}/getMe"))
     assert TOKEN not in out[0] and "***" in out[0]
 
-    def boom(_):
+    def boom(*_):
         raise RuntimeError("voll")
     TelegramNotifyHandler(logging.WARNING, [], boom).handle(_record("x", logging.ERROR, "x"))
 
 
 def test_handler_suppresses_repeats():
-    out, clock = [], FakeClock()
-    h = TelegramNotifyHandler(logging.WARNING, [], out.append,
+    out, clock = Collect(), FakeClock()
+    h = TelegramNotifyHandler(logging.WARNING, [], out,
                               repeat_suppress_s=900, monotonic=clock)
     for i in range(30):   # MQTT-Reconnect alle 10 s, Zahlen unterscheiden sich
         h.handle(_record("services.mqtt_service", logging.ERROR,
@@ -295,7 +310,7 @@ def test_sender_bundles_rate_limits_and_retries(bot):
     svc.submit("offline erzeugt")
     svc._running = True
     run(step())
-    assert list(svc._outbox) == ["offline erzeugt"]
+    assert list(svc._outbox) == [("offline erzeugt", False)]
     del svc.fake.fail["sendMessage"]
     svc.mono.advance(61)
     svc._sleep = lambda s: asyncio.sleep(0)
@@ -308,7 +323,7 @@ def test_outbox_is_bounded(bot):
     svc = bot()
     for i in range(tg.OUTBOX_SIZE + 5):
         svc.submit(f"m{i}")
-    text = svc._take_batch()
+    text, _ = svc._take_batch()
     assert "m0\n" not in text and "5 ältere Meldungen verworfen" in text
 
 
@@ -554,3 +569,127 @@ def test_http_errors_are_redacted():
         return httpx.Response(200, json={"ok": True, "result": {"username": "b"}})
 
     assert run(call(_api_with(ok))) == {"username": "b"}
+
+
+# ── Zustandsänderungen (leise) und /stumm ─────────────────────
+
+def test_state_changes_only_when_enabled():
+    out = Collect()
+    rec = _record("services.hardware", logging.INFO, "EVA Beleuchtung: EIN", "light.changed")
+    TelegramNotifyHandler(logging.WARNING, [], out).handle(rec)
+    assert out == []
+    TelegramNotifyHandler(logging.WARNING, [], out, state_changes=True).handle(rec)
+    assert len(out) == 1 and out.silent == [True]
+
+
+def test_state_changes_are_never_dropped_as_repeats():
+    out, clock = Collect(), FakeClock()
+    h = TelegramNotifyHandler(logging.WARNING, [], out, repeat_suppress_s=900,
+                              monotonic=clock, state_changes=True)
+    for old, new in ((30, 60), (60, 30), (30, 60)):
+        h.handle(_record("services.hardware", logging.INFO,
+                         f"Pumpe Sollwert {old}% → {new}%", "pump.setpoint_changed"))
+    assert len(out) == 3
+
+
+def test_readable_state_change_texts(bot):
+    svc = bot(notify_state_changes=True)
+    fmt = svc.format_event
+    svc.sim.svc._last_schedule_name = "Morgenfilterung"
+    rec = _record("services.hardware", logging.INFO, "x", "pump.setpoint_changed",
+                  pump__setpoint__old=20.0, pump__setpoint__new=60.0,
+                  pump__setpoint__reason="schedule")
+    assert fmt(rec) == "Pumpe 20 → 60 % (Zeitplan „Morgenfilterung“)"
+    rec = _record("x", logging.INFO, "x", "pump.setpoint_changed", pump__setpoint__old=60.0,
+                  pump__setpoint__new=0.0, pump__setpoint__reason="manual")
+    assert fmt(rec) == "Pumpe 60 → 0 % (manuell)"
+    assert fmt(_record("x", logging.INFO, "x", "light.changed", light__on=True)) == "Licht an"
+    rec = _record("x", logging.INFO, "x", "backwash.finished", backwash__result="ok",
+                  backwash__duration_s=212.4)
+    assert fmt(rec) == "Rückspülung fertig nach 212 s"
+    assert fmt(_record("x", logging.WARNING, "irgendwas")) is None
+
+
+def test_real_pump_and_light_changes_end_up_silent_in_outbox(bot, info_logs):
+    svc = bot(notify_state_changes=True)
+    h = TelegramNotifyHandler(logging.WARNING, [], svc.submit, state_changes=True,
+                              formatter=svc.format_event, muted=svc._is_muted)
+    root = logging.getLogger()
+    root.addHandler(h)
+    try:
+        async def scenario():
+            await svc.handle_update(msg("/pumpe 60 0"))
+            await svc.handle_update(msg("/licht an"))
+            await svc.handle_update(msg("/licht an"))      # keine Änderung → keine Meldung
+        run(scenario())
+    finally:
+        root.removeHandler(h)
+    lines = list(svc._outbox)
+    assert [t.split(" ", 2)[2] for t, _ in lines] == ["Pumpe 0 → 60 % (manuell)", "Licht an"]
+    assert all(silent for _, silent in lines)
+
+
+def test_batch_is_silent_only_if_every_line_is(bot):
+    svc = bot()
+    svc.submit("Pumpe", silent=True)
+    svc.submit("Licht", silent=True)
+    assert svc._take_batch() == ("Pumpe\nLicht", True)
+    svc.submit("Pumpe", silent=True)
+    svc.submit("⚠️ Frost", silent=False)
+    assert svc._take_batch() == ("Pumpe\n⚠️ Frost", False)
+    run(svc._send_to_all("leise", True))
+    run(svc._send_to_all("laut", False))
+    sent = svc.fake.sent()
+    assert sent[0]["disable_notification"] is True and "disable_notification" not in sent[1]
+
+
+def test_mute_drops_silent_but_keeps_warnings(bot):
+    svc = bot(notify_state_changes=True)
+    out = Collect()
+    h = TelegramNotifyHandler(logging.WARNING, [], out, state_changes=True, muted=svc._is_muted)
+    run(svc.handle_update(msg("/stumm")))
+    assert "stumm bis /laut" in svc.fake.last_text()
+    assert "Warnungen und Fehler kommen weiter" in svc.fake.last_text()
+    h.handle(_record("x", logging.INFO, "Licht an", "light.changed"))
+    h.handle(_record("x", logging.INFO, "Licht aus", "light.changed"))
+    h.handle(_record("x", logging.WARNING, "Frostschutz aktiv"))
+    assert out == [out[0]] and "Frostschutz" in out[0]
+    run(svc.handle_update(msg("/status")))
+    assert "stumm bis /laut" in svc.fake.last_text()
+    run(svc.handle_update(msg("/laut")))
+    assert "2 in der Zwischenzeit unterdrückt" in svc.fake.last_text()
+    h.handle(_record("x", logging.INFO, "Licht an", "light.changed"))
+    assert len(out) == 2
+    run(svc.handle_update(msg("/laut")))
+    assert "nicht stumm" in svc.fake.last_text()
+
+
+def test_mute_with_hours_expires_and_reports(bot):
+    svc = bot(notify_state_changes=True)
+    run(svc.handle_update(msg("/stumm 3")))
+    assert "stumm bis" in svc.fake.last_text() and "/laut" not in svc.fake.last_text().split(".")[0]
+    assert svc._is_muted()
+    svc.mono.advance(3 * 3600 + 1)
+    assert not svc._is_muted()
+    svc._check_mute_expired()
+    text, silent = svc._take_batch()
+    assert "wieder an (1 in der Zwischenzeit unterdrückt)" in text and silent
+    assert svc._muted_until is None
+
+
+def test_mute_bad_arguments_and_allowed_without_commands(bot):
+    svc = bot(commands_enabled=False)
+    for text in ("/stumm abc", "/stumm 999", "/stumm -1"):
+        run(svc.handle_update(msg(text)))
+        assert "Aufruf: /stumm" in svc.fake.last_text()
+    run(svc.handle_update(msg("/mute 2")))
+    assert "stumm bis" in svc.fake.last_text()
+    assert "Zustandsänderungen sind in der Config ohnehin aus" in svc.fake.last_text()
+    run(svc.handle_update(msg("/unmute")))
+    assert "wieder an" in svc.fake.last_text()
+
+
+def test_light_event_only_on_real_change(make_hw, info_logs):
+    hw = make_hw()
+    hw.light_on(); hw.light_on(); hw.light_off(); hw.light_off()
+    assert [r.__dict__["light.on"] for r in events_of(info_logs, "light.changed")] == [True, False]

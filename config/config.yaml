@@ -158,6 +158,7 @@ telegram:
     - backwash.finished
     - pump.mains_restore
   notify_startup: true        # Meldung bei jedem Start (zeigt auch Neustarts durch den Watchdog)
+  notify_state_changes: false # true = Pumpe %, Licht, Rückspülung melden (ohne Ton, /stumm schaltet ab)
   commands_enabled: true      # false = nur /status und /hilfe
   manual_duration_min: 120    # /pumpe und /aus gelten so lange, dann Zeitplan (0 = unbegrenzt)
   max_command_age_s: 120      # ältere Befehle (Pi war offline) werden verworfen

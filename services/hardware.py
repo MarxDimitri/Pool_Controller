@@ -684,12 +684,22 @@ class HardwareController:
     # ── Beleuchtung ───────────────────────────────────────────
 
     def light_on(self):
+        was_on = self.light_is_on
         self._relay_on(self.gpio_config["light_relay"])
-        logger.info("EVA Beleuchtung: EIN")
+        self._log_light(was_on, True)
 
     def light_off(self):
+        was_on = self.light_is_on
         self._relay_off(self.gpio_config["light_relay"])
-        logger.info("EVA Beleuchtung: AUS")
+        self._log_light(was_on, False)
+
+    def _log_light(self, was_on: bool, now_on: bool):
+        """Ereignis nur bei echter Änderung (light_off() beim Beenden/Abschalten ist oft ein No-op)."""
+        text = f"EVA Beleuchtung: {'EIN' if now_on else 'AUS'}"
+        if was_on == now_on:
+            logger.debug(f"{text} (unverändert)")
+            return
+        log_event(logger, logging.INFO, "light.changed", text, **{"light.on": now_on})
 
     @property
     def light_is_on(self) -> bool:

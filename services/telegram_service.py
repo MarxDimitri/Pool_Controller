@@ -3,9 +3,11 @@ Pool Marx — Telegram-Bot (optional)
 
 Zwei Aufgaben:
 1. Benachrichtigungen: ein logging.Handler leitet ausgewählte Log-Meldungen
-   (ab notify_level, dazu einzelne Ereignisse wie backwash.finished) an die
-   freigegebenen Telegram-Nutzer weiter. Meldungen kurz hintereinander werden
-   zu einer Nachricht gebündelt, die Anzahl pro Minute ist begrenzt.
+   an die freigegebenen Telegram-Nutzer weiter. Meldungen kurz hintereinander
+   werden zu einer Nachricht gebündelt, die Anzahl pro Minute ist begrenzt.
+   - laut (mit Ton): Warnungen und Fehler (ab notify_level, mindestens WARNING)
+   - leise (ohne Ton): notify_events und — mit notify_state_changes —
+     Zustandsänderungen (Pumpe %, Licht, Rückspülung). Per /stumm abschaltbar.
 2. Befehle: Long Polling (getUpdates). Der Pi baut die Verbindung zu
    api.telegram.org selbst auf — keine Portfreigabe, kein Webhook.
 
@@ -48,6 +50,7 @@ TELEGRAM_DEFAULTS = {
     "notify_level": "WARNING",
     "notify_events": ["frost.deactivated", "backwash.finished", "pump.mains_restore"],
     "notify_startup": True,
+    "notify_state_changes": False,
     "commands_enabled": True,
     "manual_duration_min": 120,
     "max_command_age_s": 120,
@@ -57,6 +60,19 @@ TELEGRAM_DEFAULTS = {
     "bundle_interval_s": 2.0,
     "poll_timeout_s": 30,
 }
+
+# Zustandsänderungen (leise, mit notify_state_changes)
+STATE_EVENTS = frozenset({"pump.setpoint_changed", "light.changed",
+                          "backwash.started", "backwash.finished"})
+EVENT_ICONS = {"pump.setpoint_changed": "🌀", "light.changed": "💡",
+               "backwash.started": "🔄", "backwash.finished": "🔄",
+               "frost.deactivated": "❄️", "pump.mains_restore": "🔌"}
+REASON_NAMES = {"schedule": "Zeitplan", "min_speed": "Winterbetrieb", "manual": "manuell",
+                "frost": "Frostschutz", "backwash": "Rückspülung", "emergency": "Abschaltung",
+                "mains_cutoff": "Netz getrennt", "shutdown": "Dienst beendet",
+                "other": "sonstiges"}
+BACKWASH_RESULT_NAMES = {"ok": "fertig", "cancelled": "abgebrochen", "error": "mit Fehler beendet"}
+MAX_MUTE_HOURS = 168
 
 # Nie weiterleiten: eigener Transport + HTTP-Bibliotheken
 EXCLUDED_LOGGERS = (__name__, "httpx", "httpcore")
@@ -87,6 +103,9 @@ HELP_TEXT = (
     "/rueckspuelen — Rückspülung starten (mit Bestätigung)\n"
     "/abschalten — alles abschalten und verriegeln (mit Bestätigung)\n"
     "/notiz <Text> — Pumpenfehler notieren (z. B. E-04)\n"
+    "/stumm — Statusmeldungen aus (Warnungen kommen weiter)\n"
+    "/stumm 3 — Statusmeldungen für 3 Stunden aus\n"
+    "/laut — Statusmeldungen wieder an\n"
     "\n"
     "Not-Aus quittieren geht nur am Dashboard im LAN."
 )
@@ -128,6 +147,7 @@ def load_telegram_config(config: dict) -> dict:
     cfg = dict(TELEGRAM_DEFAULTS)
     cfg["enabled"] = raw.get("enabled", False) is True
     cfg["notify_startup"] = raw.get("notify_startup", True) is True
+    cfg["notify_state_changes"] = raw.get("notify_state_changes", False) is True
     cfg["commands_enabled"] = raw.get("commands_enabled", True) is True
 
     ids = raw.get("allowed_user_ids") or []
@@ -228,21 +248,32 @@ class TelegramNotifyHandler(logging.Handler):
     """
     Wählt Log-Meldungen aus und legt sie in den Postausgang. Blockiert nie
     (wird auch aus dem DAC-Thread aufgerufen), sendet selbst nichts.
+
+    Laut (mit Ton): ab WARNING; gleiche Meldungen werden nur alle
+    repeat_suppress_s weitergegeben. Leise (ohne Ton): alles darunter, also
+    notify_events und Zustandsänderungen; fällt weg, solange muted() True ist.
     """
 
     ICONS = {logging.CRITICAL: "🛑", logging.ERROR: "🔴", logging.WARNING: "⚠️"}
 
-    def __init__(self, notify_level: int, notify_events, submit: Callable[[str], None],
+    def __init__(self, notify_level: int, notify_events, submit: Callable[[str, bool], None],
                  redact: Optional[Callable[[str], str]] = None,
                  repeat_suppress_s: float = 0.0,
-                 monotonic: Callable[[], float] = time.monotonic):
+                 monotonic: Callable[[], float] = time.monotonic,
+                 *,
+                 state_changes: bool = False,
+                 formatter: Optional[Callable[[logging.LogRecord], Optional[str]]] = None,
+                 muted: Optional[Callable[[], bool]] = None):
         super().__init__(level=logging.DEBUG)   # Auswahl in accept()
         self.notify_level = notify_level
         self.notify_events = frozenset(notify_events)
+        self.state_changes = state_changes
         self._submit = submit
         self._redact = redact or (lambda s: s)
         self._repeat_s = repeat_suppress_s
         self._monotonic = monotonic
+        self._formatter = formatter
+        self._muted = muted
         self._recent: dict = {}   # Schlüssel → [zuletzt gesendet, unterdrückt seitdem]
 
     def accept(self, record: logging.LogRecord) -> bool:
@@ -252,12 +283,18 @@ class TelegramNotifyHandler(logging.Handler):
                 return False
         if record.levelno >= self.notify_level:
             return True
-        return getattr(record, "event.name", None) in self.notify_events
+        event = getattr(record, "event.name", None)
+        return event in self.notify_events or (self.state_changes and event in STATE_EVENTS)
 
-    def format_line(self, record: logging.LogRecord) -> str:
-        icon = self.ICONS.get(record.levelno, "ℹ️")
+    @staticmethod
+    def is_silent(record: logging.LogRecord) -> bool:
+        return record.levelno < logging.WARNING
+
+    def format_line(self, record: logging.LogRecord, text: Optional[str] = None) -> str:
+        icon = self.ICONS.get(record.levelno) or EVENT_ICONS.get(
+            getattr(record, "event.name", None), "ℹ️")
         stamp = datetime.fromtimestamp(record.created).strftime("%H:%M:%S")
-        text = sanitize_text(record.getMessage(), max_len=600)
+        text = sanitize_text(text if text is not None else record.getMessage(), max_len=600)
         return self._redact(f"{icon} {stamp} {text}")
 
     def _repeat_key(self, record: logging.LogRecord) -> tuple:
@@ -285,13 +322,22 @@ class TelegramNotifyHandler(logging.Handler):
         try:
             if not self.accept(record):
                 return
-            skipped = self._suppressed(record)
-            if skipped is None:
-                return
-            line = self.format_line(record)
+            silent = self.is_silent(record)
+            skipped = 0
+            if silent:
+                # Zustandsänderungen nie als Wiederholung verwerfen (30→60→30 % sind
+                # drei echte Änderungen) — aber per /stumm abschaltbar
+                if self._muted is not None and self._muted():
+                    return
+            else:
+                skipped = self._suppressed(record)
+                if skipped is None:
+                    return
+            text = self._formatter(record) if self._formatter is not None else None
+            line = self.format_line(record, text)
             if skipped:
                 line += f" (seit der letzten Meldung {skipped}× wiederholt)"
-            self._submit(line)
+            self._submit(line, silent)
         except Exception:   # Logging darf die Steuerung nie stören
             pass
 
@@ -330,6 +376,9 @@ class TelegramService:
         self._handler: Optional[TelegramNotifyHandler] = None
         self._tasks: list = []
         self._offline_since: Optional[float] = None
+        self._muted_until: Optional[float] = None    # monotonic; inf = bis /laut
+        self._muted_until_wall: Optional[datetime] = None
+        self._muted_count = 0
         self._running = False
         self.enabled = False
         self.disabled_reason = ""
@@ -375,7 +424,9 @@ class TelegramService:
             logging.getLevelName(self.cfg["notify_level"]),
             self.cfg["notify_events"], self.submit, self.redact,
             repeat_suppress_s=self.cfg["repeat_suppress_min"] * 60.0,
-            monotonic=self._monotonic)
+            monotonic=self._monotonic,
+            state_changes=self.cfg["notify_state_changes"],
+            formatter=self.format_event, muted=self._is_muted)
         logging.getLogger().addHandler(self._handler)
 
         try:
@@ -427,33 +478,41 @@ class TelegramService:
 
     # ── Senden ────────────────────────────────────────────────
 
-    def submit(self, text: str):
-        """Thread-sicher: Nachricht in den Postausgang legen (älteste fallen raus)."""
+    def submit(self, text: str, silent: bool = False):
+        """
+        Thread-sicher: Nachricht in den Postausgang legen (älteste fallen raus).
+        silent=True → ohne Ton (disable_notification), solange die ganze
+        gebündelte Nachricht nur aus leisen Zeilen besteht.
+        """
         with self._outbox_lock:
             if len(self._outbox) >= OUTBOX_SIZE:
                 self._outbox.popleft()
                 self._dropped += 1
-            self._outbox.append(text)
+            self._outbox.append((text, silent))
 
-    def _take_batch(self) -> Optional[str]:
+    def _take_batch(self) -> Optional[tuple]:
+        """(Text, leise) der nächsten gebündelten Nachricht oder None."""
         with self._outbox_lock:
             if not self._outbox:
                 return None
-            lines, size = [], 0
-            while self._outbox and size + len(self._outbox[0]) + 1 <= MAX_MESSAGE_LEN:
-                line = self._outbox.popleft()
+            lines, size, silent = [], 0, True
+            while self._outbox and size + len(self._outbox[0][0]) + 1 <= MAX_MESSAGE_LEN:
+                line, quiet = self._outbox.popleft()
                 lines.append(line)
+                silent = silent and quiet
                 size += len(line) + 1
             if not lines:   # einzelne überlange Zeile
-                lines.append(self._outbox.popleft()[:MAX_MESSAGE_LEN - 1] + "…")
+                line, quiet = self._outbox.popleft()
+                lines.append(line[:MAX_MESSAGE_LEN - 1] + "…")
+                silent = quiet
             dropped, self._dropped = self._dropped, 0
         if dropped:
             lines.append(f"(… {dropped} ältere Meldungen verworfen)")
-        return "\n".join(lines)
+        return "\n".join(lines), silent
 
-    def _put_back(self, text: str):
+    def _put_back(self, batch: tuple):
         with self._outbox_lock:
-            self._outbox.appendleft(text)
+            self._outbox.appendleft(batch)
             while len(self._outbox) > OUTBOX_SIZE:
                 self._outbox.pop()
                 self._dropped += 1
@@ -464,17 +523,19 @@ class TelegramService:
             self._sent_times.popleft()
         return len(self._sent_times) < self.cfg["max_messages_per_min"]
 
-    async def _send_to_all(self, text: str):
+    async def _send_to_all(self, text: str, silent: bool = False):
         for uid in self.cfg["allowed_user_ids"]:
-            await self._api("sendMessage", {"chat_id": uid, "text": text,
-                                            "disable_web_page_preview": True}, None)
+            payload = {"chat_id": uid, "text": text, "disable_web_page_preview": True}
+            if silent:
+                payload["disable_notification"] = True
+            await self._api("sendMessage", payload, None)
 
     async def _flush(self):
         while True:
-            text = self._take_batch()
-            if text is None:
+            batch = self._take_batch()
+            if batch is None:
                 return
-            await self._send_to_all(text)
+            await self._send_to_all(*batch)
 
     async def _sender_loop(self):
         if self.cfg["notify_startup"]:
@@ -483,20 +544,92 @@ class TelegramService:
         backoff = 0.0
         while self._running:
             await self._sleep(max(self.cfg["bundle_interval_s"], backoff))
+            self._check_mute_expired()
             if not self._rate_ok():
                 continue   # Meldungen sammeln sich weiter, gehen gebündelt raus
-            text = self._take_batch()
-            if text is None:
+            batch = self._take_batch()
+            if batch is None:
                 continue
             try:
-                await self._send_to_all(text)
+                await self._send_to_all(*batch)
                 self._sent_times.append(self._monotonic())
                 backoff = 0.0
                 self._mark_online()
             except TelegramApiError as e:
-                self._put_back(text)
+                self._put_back(batch)
                 backoff = self._next_backoff(backoff, e)
                 self._mark_offline(e)
+
+    # ── Stumm / laut ──────────────────────────────────────────
+
+    def _is_muted(self) -> bool:
+        """Vom Handler (beliebiger Thread) gefragt: leise Meldung verwerfen?"""
+        until = self._muted_until
+        if until is None or self._monotonic() >= until:
+            return False
+        self._muted_count += 1
+        return True
+
+    def mute(self, hours: Optional[int]):
+        now = self._monotonic()
+        if hours:
+            self._muted_until = now + hours * 3600.0
+            self._muted_until_wall = datetime.now() + timedelta(hours=hours)
+        else:
+            self._muted_until = float("inf")
+            self._muted_until_wall = None
+        self._muted_count = 0
+
+    def unmute(self) -> Optional[int]:
+        """Stumm aufheben. Gibt die Anzahl unterdrückter Meldungen zurück (None = war nicht stumm)."""
+        if self._muted_until is None:
+            return None
+        count = self._muted_count
+        self._muted_until = None
+        self._muted_until_wall = None
+        self._muted_count = 0
+        return count
+
+    def _check_mute_expired(self):
+        if self._muted_until is not None and self._monotonic() >= self._muted_until:
+            count = self.unmute()
+            self.submit(f"🔈 Statusmeldungen wieder an ({count} in der Zwischenzeit unterdrückt)",
+                        silent=True)
+
+    def _mute_text(self) -> Optional[str]:
+        if self._muted_until is None:
+            return None
+        if self._muted_until_wall is None:
+            return "🔇 Statusmeldungen stumm bis /laut"
+        return f"🔇 Statusmeldungen stumm bis {self._muted_until_wall:%H:%M}"
+
+    # ── Text für Zustandsänderungen ───────────────────────────
+
+    def format_event(self, record: logging.LogRecord) -> Optional[str]:
+        """
+        Lesbarer Text für bekannte Ereignisse, sonst None (→ Log-Text).
+        Wird im Handler aufgerufen, auch aus dem DAC-Thread: nur Attribute
+        lesen, keine Locks nehmen.
+        """
+        event = getattr(record, "event.name", None)
+        attr = lambda key: getattr(record, key, None)   # noqa: E731
+        if event == "pump.setpoint_changed":
+            old, new = attr("pump.setpoint.old"), attr("pump.setpoint.new")
+            reason = attr("pump.setpoint.reason")
+            why = REASON_NAMES.get(reason, reason or "?")
+            if reason in ("schedule", "min_speed"):
+                entry = getattr(self.pump, "_last_schedule_name", None)
+                if entry:
+                    why += f" „{entry}“"
+            return f"Pumpe {old:g} → {new:g} % ({why})"
+        if event == "light.changed":
+            return "Licht an" if attr("light.on") else "Licht aus"
+        if event == "backwash.started":
+            return f"Rückspülung startet ({attr('backwash.speed_pct')} %)"
+        if event == "backwash.finished":
+            result = BACKWASH_RESULT_NAMES.get(attr("backwash.result"), attr("backwash.result"))
+            return f"Rückspülung {result} nach {attr('backwash.duration_s') or 0:.0f} s"
+        return None
 
     # ── Empfangen ─────────────────────────────────────────────
 
@@ -667,6 +800,25 @@ class TelegramService:
             return HELP_TEXT.format(dur=self._duration_text()), None
         if cmd == "status":
             return self.status_text(), None
+        # Meldungen steuern ist keine Pool-Steuerung → auch mit commands_enabled: false
+        if cmd in ("stumm", "mute"):
+            try:
+                hours = int(args[0]) if args else 0
+                if not 0 <= hours <= MAX_MUTE_HOURS:
+                    raise ValueError
+            except ValueError:
+                return f"Aufruf: /stumm [Stunden 1–{MAX_MUTE_HOURS}, ohne = bis /laut]", None
+            self.mute(hours)
+            note = "" if self.cfg["notify_state_changes"] else (
+                "\n(Zustandsänderungen sind in der Config ohnehin aus; "
+                "betrifft nur die übrigen leisen Meldungen.)")
+            return (f"{self._mute_text()}. Warnungen und Fehler kommen weiter.\n"
+                    f"Gilt bis zum nächsten Neustart des Dienstes.{note}"), None
+        if cmd in ("laut", "unmute"):
+            count = self.unmute()
+            if count is None:
+                return "Statusmeldungen sind nicht stumm.", None
+            return f"🔈 Statusmeldungen wieder an ({count} in der Zwischenzeit unterdrückt).", None
         known = ("pumpe", "aus", "zeitplan", "licht", "rueckspuelen", "rückspülen",
                  "abschalten", "notiz", "quittieren")
         if cmd not in known:
@@ -788,6 +940,11 @@ class TelegramService:
                 lines.append("Rückspülung läuft")
             if s["dac_write_errors"]:
                 lines.append(f"DAC-Schreibfehler seit Start: {s['dac_write_errors']}")
+            mute = self._mute_text()
+            if mute:
+                lines.append(mute)
+            elif self.cfg["notify_state_changes"]:
+                lines.append("Statusmeldungen: an (ohne Ton) — /stumm zum Abschalten")
             if hw.get("simulation"):
                 lines.append("(Simulationsmodus)")
             return "\n".join(lines)
@@ -801,10 +958,12 @@ class TelegramService:
             ("aus", "Pumpe aus"), ("zeitplan", "Zurück zum Zeitplan"),
             ("licht", "/licht an oder /licht aus"), ("rueckspuelen", "Rückspülung starten"),
             ("abschalten", "Alles abschalten und verriegeln"),
-            ("notiz", "Pumpenfehler notieren"), ("hilfe", "Alle Befehle"),
+            ("notiz", "Pumpenfehler notieren"),
+            ("stumm", "Statusmeldungen aus, z. B. /stumm 3 (Stunden)"),
+            ("laut", "Statusmeldungen wieder an"), ("hilfe", "Alle Befehle"),
         ]
         if not self.cfg["commands_enabled"]:
-            commands = [c for c in commands if c[0] in ("status", "hilfe")]
+            commands = [c for c in commands if c[0] in ("status", "stumm", "laut", "hilfe")]
         try:
             await self._api("setMyCommands", {"commands": [
                 {"command": c, "description": d} for c, d in commands]}, None)

@@ -12,6 +12,24 @@ Neue Einträge kommen unter **[Unreleased]**. `release/release.py` macht daraus 
 
 ## [Unreleased]
 
+### Added
+- Telegram: Zustandsänderungen melden mit `telegram.notify_state_changes: true` (Standard aus).
+  Pumpe % mit Grund (z. B. `Pumpe 20 → 60 % (Zeitplan „Morgenfilterung“)`), Licht an/aus,
+  Rückspülung Start/Ende. Kommen **ohne Ton**.
+- Telegram: `/stumm [Stunden]` schaltet alle Meldungen ohne Ton ab, `/laut` wieder an.
+  Warnungen und Fehler kommen weiter. Funktioniert auch mit `commands_enabled: false`.
+- Ereignis `light.changed` (nur bei echter Änderung des Lichts)
+
+### Changed
+- Telegram: Meldungen unter WARNING (z. B. Frostschutz aus, Rückspülung fertig) kommen jetzt
+  ohne Ton. Die Unterdrückung gleicher Meldungen gilt nur noch für Warnungen und Fehler.
+- Log: „EVA Beleuchtung: AUS“ erscheint nicht mehr bei jedem Beenden/Abschalten, wenn das Licht
+  ohnehin aus war (nur noch DEBUG)
+
+### Einmalig beim Update auf dem Pi
+Optional, für Zustandsmeldungen: in der `config.yaml` auf dem Pi unter `telegram:` die Zeile
+`notify_state_changes: true` ergänzen, Dienst neu starten.
+
 ## [1.3.1] - 2026-11-25
 
 ### Fixed

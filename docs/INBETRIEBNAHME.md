@@ -506,7 +506,8 @@ Mosquitto sollte nur auf `127.0.0.1` lauschen und anonyme Zugriffe verbieten.
 
 ### 10.5 Telegram (optional)
 
-Meldungen aufs Handy und Befehle wie `/status`, `/pumpe 60`, `/abschalten`.
+Meldungen aufs Handy, optional jede Zustandsänderung ohne Ton (`/stumm` schaltet
+sie ab), und Befehle wie `/status`, `/pumpe 60`, `/abschalten`.
 Der Pi verbindet sich nur nach außen, es wird kein Port geöffnet. Quittieren
 geht bewusst nur am Dashboard. Einrichtung: [telegram.md](telegram.md).
 
