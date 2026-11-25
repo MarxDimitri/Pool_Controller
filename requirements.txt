@@ -1,5 +1,8 @@
 fastapi
 uvicorn
+# WebSocket-Unterstützung für uvicorn (/ws, Live-Updates im Dashboard).
+# uvicorn bringt sie nicht selbst mit; fehlt sie, antwortet /ws mit 404.
+websockets
 pyyaml
 aiomqtt
 # Nur auf dem Raspberry Pi (ohne diese Pakete läuft die Software im Simulationsmodus)

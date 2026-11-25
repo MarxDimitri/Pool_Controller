@@ -8,9 +8,14 @@ Alle nennenswerten Änderungen an Pool Marx. Format nach
 - **MINOR**: neue Funktion, rückwärtskompatibel (neue Config-Abschnitte mit Standardwerten zählen dazu)
 - **PATCH**: Fehlerbehebung ohne neue Funktion
 
-Neue Einträge kommen unter **[Unreleased]**. `scripts/release.py` macht daraus beim Release die neue Version.
+Neue Einträge kommen unter **[Unreleased]**. `release/release.py` macht daraus beim Release die neue Version.
 
 ## [Unreleased]
+
+### Fixed
+- Dashboard meldete dauerhaft „getrennt – erneuter Versuch…“: Im frischen venv pro Version fehlte
+  eine WebSocket-Bibliothek für uvicorn, `/ws` antwortete mit 404. `websockets` steht jetzt in
+  `requirements.txt`; ein Test startet einen echten Server und prüft die Verbindung.
 
 ## [1.2.0] - 2026-11-24
 
