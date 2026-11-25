@@ -12,6 +12,8 @@ Neue Einträge kommen unter **[Unreleased]**. `release/release.py` macht daraus 
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-25
+
 ### Added
 - Beleuchtung mit eigenem Zeitplan (`lighting.schedule`): Zeitfenster mit `start`/`end` als `HH:MM`
   oder `sunset`/`sunrise` ± Minuten (braucht `lighting.latitude`/`longitude`), Helligkeit pro Fenster,
@@ -156,7 +158,8 @@ Keine Änderung an Steuerung, API oder `config.yaml`. Für den neuen Deploy-Abla
 Ausgangsstand vor Einführung von Git (nicht getaggt): Zeitplan, Frostschutz,
 Rückspülung, verriegelter Not-Aus, Web-Dashboard mit Login, MQTT.
 
-[Unreleased]: https://github.com/MarxDimitri/Pool_Controller/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/MarxDimitri/Pool_Controller/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/MarxDimitri/Pool_Controller/releases/tag/v1.5.0
 [1.4.0]: https://github.com/MarxDimitri/Pool_Controller/releases/tag/v1.4.0
 [1.3.1]: https://github.com/MarxDimitri/Pool_Controller/releases/tag/v1.3.1
 [1.3.0]: https://github.com/MarxDimitri/Pool_Controller/releases/tag/v1.3.0
