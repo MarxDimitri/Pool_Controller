@@ -12,6 +12,8 @@ Neue Einträge kommen unter **[Unreleased]**. `release/release.py` macht daraus 
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-25
+
 ### Added
 - Telegram: Zustandsänderungen melden mit `telegram.notify_state_changes: true` (Standard aus).
   Pumpe % mit Grund (z. B. `Pumpe 20 → 60 % (Zeitplan „Morgenfilterung“)`), Licht an/aus,
@@ -120,7 +122,8 @@ Keine Änderung an Steuerung, API oder `config.yaml`. Für den neuen Deploy-Abla
 Ausgangsstand vor Einführung von Git (nicht getaggt): Zeitplan, Frostschutz,
 Rückspülung, verriegelter Not-Aus, Web-Dashboard mit Login, MQTT.
 
-[Unreleased]: https://github.com/MarxDimitri/Pool_Controller/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/MarxDimitri/Pool_Controller/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/MarxDimitri/Pool_Controller/releases/tag/v1.4.0
 [1.3.1]: https://github.com/MarxDimitri/Pool_Controller/releases/tag/v1.3.1
 [1.3.0]: https://github.com/MarxDimitri/Pool_Controller/releases/tag/v1.3.0
 [1.2.1]: https://github.com/MarxDimitri/Pool_Controller/releases/tag/v1.2.1
