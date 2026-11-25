@@ -12,6 +12,8 @@ Neue Einträge kommen unter **[Unreleased]**. `release/release.py` macht daraus 
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-11-25
+
 ### Fixed
 - Dashboard meldete dauerhaft „getrennt – erneuter Versuch…“: Im frischen venv pro Version fehlte
   eine WebSocket-Bibliothek für uvicorn, `/ws` antwortete mit 404. `websockets` steht jetzt in
@@ -68,6 +70,7 @@ Keine Änderung an Steuerung, API oder `config.yaml`. Für den neuen Deploy-Abla
 Ausgangsstand vor Einführung von Git (nicht getaggt): Zeitplan, Frostschutz,
 Rückspülung, verriegelter Not-Aus, Web-Dashboard mit Login, MQTT.
 
-[Unreleased]: https://github.com/MarxDimitri/Pool_Controller/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/MarxDimitri/Pool_Controller/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/MarxDimitri/Pool_Controller/releases/tag/v1.2.1
 [1.2.0]: https://github.com/MarxDimitri/Pool_Controller/releases/tag/v1.2.0
 [1.1.0]: https://github.com/MarxDimitri/Pool_Controller/releases/tag/v1.1.0
