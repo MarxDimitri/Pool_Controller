@@ -12,6 +12,12 @@ Neue Einträge kommen unter **[Unreleased]**. `release/release.py` macht daraus 
 
 ## [Unreleased]
 
+### Fixed
+- `docs/telegram.md`: Befehl zum Ermitteln der Nutzer-ID scheiterte mit „Unterminated quoted string“,
+  wenn `secrets.env` Werte mit Anführungszeichen enthält. Er liest jetzt nur die Token-Zeile.
+- Telegram: Steht in `allowed_user_ids` ein Name statt einer Zahl (z. B. der Bot-Name), erklärt die
+  Warnung jetzt, dass die eigene Nutzer-ID gemeint ist, und verweist auf die Anleitung.
+
 ## [1.3.0] - 2026-11-25
 
 ### Added

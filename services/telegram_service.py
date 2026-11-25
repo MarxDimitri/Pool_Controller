@@ -140,7 +140,12 @@ def load_telegram_config(config: dict) -> dict:
         elif isinstance(uid, str) and uid.strip().isdigit():
             valid.append(int(uid.strip()))
         else:
-            logger.warning(f"telegram.allowed_user_ids: {uid!r} ist keine Nutzer-ID — ignoriert")
+            hint = (" — das sieht nach einem Namen aus (z. B. dem Bot-Namen). Gemeint ist "
+                    "deine eigene Telegram-Nutzer-ID, eine Zahl wie 518273645 "
+                    "(ermitteln: docs/telegram.md, Abschnitt 3)"
+                    if isinstance(uid, str) and not uid.strip().lstrip("-").isdigit() else "")
+            logger.warning(f"telegram.allowed_user_ids: {uid!r} ist keine Nutzer-ID — "
+                           f"ignoriert{hint}")
     cfg["allowed_user_ids"] = valid
 
     level = str(raw.get("notify_level", "WARNING")).upper()
@@ -337,7 +342,8 @@ class TelegramService:
         elif not self._token and self._api is None:
             self.disabled_reason = "POOL_TELEGRAM_TOKEN fehlt"
         elif not self.cfg["allowed_user_ids"]:
-            self.disabled_reason = "telegram.allowed_user_ids ist leer"
+            self.disabled_reason = ("telegram.allowed_user_ids ist leer — eigene "
+                                    "Telegram-Nutzer-ID (Zahl) eintragen, siehe docs/telegram.md")
         else:
             return True
         return False

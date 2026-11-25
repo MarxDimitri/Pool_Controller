@@ -126,6 +126,13 @@ def test_invalid_values_fall_back(caplog):
     assert "ungültig" in caplog.text
 
 
+def test_bot_name_instead_of_user_id_explains_itself(caplog):
+    cfg = load_telegram_config({"telegram": {"enabled": True,
+                                             "allowed_user_ids": ["Pool77Bot"]}})
+    assert cfg["allowed_user_ids"] == []
+    assert "eigene Telegram-Nutzer-ID" in caplog.text and "docs/telegram.md" in caplog.text
+
+
 def test_token_comes_from_environment(monkeypatch):
     cfg = {"telegram": {}}
     monkeypatch.setenv("POOL_TELEGRAM_TOKEN", TOKEN)

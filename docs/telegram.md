@@ -48,12 +48,17 @@ Dem neuen Bot in Telegram irgendeine Nachricht schicken, dann auf dem Pi,
 **solange `telegram.enabled` noch `false` ist**:
 
 ```bash
-sudo sh -c '. /etc/pool_marx/secrets.env; curl -s "https://api.telegram.org/bot$POOL_TELEGRAM_TOKEN/getUpdates"' \
-  | grep -o '"from":{"id":[0-9]*'
+TOKEN=$(sudo sed -n 's/^POOL_TELEGRAM_TOKEN=//p' /etc/pool_marx/secrets.env)
+curl -s "https://api.telegram.org/bot$TOKEN/getUpdates" | grep -o '"from":{"id":[0-9]*'
+unset TOKEN
 ```
 
-Die Zahl ist deine Nutzer-ID. Das Kommando liest den Token aus der Datei,
-dadurch landet er nicht in der Shell-History.
+Die Zahl ist deine Nutzer-ID. Sie gehört in `allowed_user_ids`, **nicht** der
+Name des Bots (`@…Bot`). Der Token wird aus der Datei gelesen und landet
+nicht in der Shell-History. Die Datei wird bewusst nicht mit `.`/`source`
+eingelesen: Passwörter mit Sonderzeichen (`'`, `"`, `$`) sind für systemd in
+Ordnung, für die Shell aber nicht. Kommt keine Ausgabe, dem Bot erneut
+schreiben und den `curl`-Befehl wiederholen.
 
 ## 4. Konfiguration
 
