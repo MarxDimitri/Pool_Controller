@@ -12,6 +12,8 @@ Neue Einträge kommen unter **[Unreleased]**. `release/release.py` macht daraus 
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-11-25
+
 ### Fixed
 - `docs/telegram.md`: Befehl zum Ermitteln der Nutzer-ID scheiterte mit „Unterminated quoted string“,
   wenn `secrets.env` Werte mit Anführungszeichen enthält. Er liest jetzt nur die Token-Zeile.
@@ -100,7 +102,8 @@ Keine Änderung an Steuerung, API oder `config.yaml`. Für den neuen Deploy-Abla
 Ausgangsstand vor Einführung von Git (nicht getaggt): Zeitplan, Frostschutz,
 Rückspülung, verriegelter Not-Aus, Web-Dashboard mit Login, MQTT.
 
-[Unreleased]: https://github.com/MarxDimitri/Pool_Controller/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/MarxDimitri/Pool_Controller/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/MarxDimitri/Pool_Controller/releases/tag/v1.3.1
 [1.3.0]: https://github.com/MarxDimitri/Pool_Controller/releases/tag/v1.3.0
 [1.2.1]: https://github.com/MarxDimitri/Pool_Controller/releases/tag/v1.2.1
 [1.2.0]: https://github.com/MarxDimitri/Pool_Controller/releases/tag/v1.2.0

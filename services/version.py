@@ -6,4 +6,4 @@ Nicht von Hand ändern: release/release.py setzt den Wert beim Release
 (Semantic Versioning, Git-Tag vX.Y.Z). Ablauf: siehe CHANGELOG.md / README.
 """
 
-__version__ = "1.3.0"
+__version__ = "1.3.1"
