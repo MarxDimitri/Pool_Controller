@@ -20,6 +20,9 @@ Runs on a Raspberry Pi 4. Without Pi hardware it falls back to a simulation mode
   Home Assistant discovery.
 - **Diagnostics:** every setpoint change and schedule transition is logged with a
   reason. A "fault note" endpoint records pump errors together with the current state.
+- **Lighting** with its own schedule (fixed times or sunset/sunrise ± minutes,
+  brightness per time window) and a manual mode that pauses it. Dimming goes
+  through a pluggable dimmer; for now it is simulated (no dimmer installed yet).
 - **Optional Telegram bot**: notifications for warnings and selected events, and
   commands (`/status`, `/pumpe 60`, `/abschalten` …) for whitelisted users. Outbound
   HTTPS only (long polling), no open ports. Off by default.
@@ -58,6 +61,8 @@ main.py
  ├─ api/main.py               FastAPI (uvicorn): REST, WebSocket, login, static dashboard (web/)
  ├─ services/pump_service.py  schedule, min speed, frost, backwash, manual mode, emergency latch
  ├─ services/hardware.py      GPIO relays, float switch, MCP4725 + ramp/refresh thread
+ ├─ services/light_service.py lighting schedule (incl. sunset/sunrise), manual mode, brightness
+ ├─ services/dimmer.py       dimmer drivers (simulation for now)
  ├─ services/mqtt_service.py  optional MQTT + Home Assistant discovery
  ├─ services/telemetry.py     optional OpenTelemetry logs/metrics (background exporter threads)
  ├─ services/telegram_service.py  optional Telegram bot: notifications + commands

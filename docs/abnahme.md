@@ -85,6 +85,11 @@ Fazit: Tritt E-04 □ bei Übergängen, □ bei Unterspannung oder □ zufällig
 - [ ] beide LED-Treiber schalten
 - [ ] Relaiskanal entspricht GPIO 25
 - [ ] Dashboard-Zustand korrekt (auch nach einem Reload)
+- [ ] Zeitplan: Licht geht zur eingestellten Zeit an und aus (Log `Licht-Zeitplan:`)
+- [ ] Schalter/Regler → Modus Manuell; „Licht zurück zum Zeitplan“ stellt den Zeitplanwert her
+- [ ] Mit Koordinaten: `sunset` liegt laut Dashboard („nächster Wechsel“) plausibel
+- [ ] „Alles abschalten“ → Licht aus, lässt sich nicht einschalten; nach Quittieren wieder
+- [ ] Nach Einbau des Dimmers: Helligkeit 10/30/60/100 % sichtbar verschieden, kein Flackern
 
 ## C8 — Telemetrie in Elastic
 

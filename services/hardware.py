@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Callable, Optional
 
+from .dimmer import create_dimmer, load_dimmer_settings
 from .events import log_event
 
 logger = logging.getLogger(__name__)
@@ -251,7 +252,7 @@ class HardwareController:
 
     def __init__(self, config: dict, *, gpio=None, i2c_bus=None,
                  clock: Optional[Callable[[], float]] = None,
-                 start_thread: bool = True):
+                 start_thread: bool = True, dimmer=None):
         self.config = config
         self.gpio_config = config["gpio"]
         self._relay_states = {}
@@ -306,6 +307,12 @@ class HardwareController:
             self.GPIO = MockGPIO()
         else:
             self.GPIO = GPIO
+
+        # Beleuchtung: Relais = Hauptschalter, Dimmer = Helligkeit
+        self.dimmer_settings = load_dimmer_settings(config)
+        self.dimmer = dimmer or create_dimmer(self.dimmer_settings)
+        self._light_pct = 0           # 0 = aus
+        self._light_last_pct = 100    # für light_on() ohne Wert
 
         self._setup_gpio()
         self._setup_dac(i2c_bus)
@@ -683,23 +690,61 @@ class HardwareController:
 
     # ── Beleuchtung ───────────────────────────────────────────
 
-    def light_on(self):
-        was_on = self.light_is_on
-        self._relay_on(self.gpio_config["light_relay"])
-        self._log_light(was_on, True)
+    def set_light(self, pct, reason: str = "manual", entry: Optional[str] = None) -> int:
+        """
+        Helligkeit 0–100 % setzen (0 = aus). Werte unter dimmer.min_pct werden
+        auf min_pct angehoben. Reihenfolge: einschalten = erst Dimmer, dann
+        Relais; ausschalten = erst Relais, dann Dimmer (kein Aufblitzen).
+        Gibt die tatsächlich gesetzte Helligkeit zurück.
+        """
+        try:
+            pct = int(round(float(pct)))
+        except (TypeError, ValueError):
+            raise ValueError(f"Helligkeit ungültig: {pct!r}")
+        pct = max(0, min(100, pct))
+        if 0 < pct < self.dimmer_settings.min_pct:
+            pct = self.dimmer_settings.min_pct
+        old_pct, was_on = self._light_pct, self.light_is_on
+        pin = self.gpio_config["light_relay"]
+        if pct > 0:
+            self.dimmer.set_level(pct)
+            self._relay_on(pin)
+            self._light_last_pct = pct
+        else:
+            self._relay_off(pin)
+            self.dimmer.set_level(0)
+        self._light_pct = pct
+        self._log_light(was_on, old_pct, pct, reason, entry)
+        return pct
 
-    def light_off(self):
-        was_on = self.light_is_on
-        self._relay_off(self.gpio_config["light_relay"])
-        self._log_light(was_on, False)
+    def light_on(self, pct=None, reason: str = "manual"):
+        """Licht an — mit pct oder der zuletzt genutzten Helligkeit."""
+        return self.set_light(pct if pct else self._light_last_pct, reason=reason)
 
-    def _log_light(self, was_on: bool, now_on: bool):
+    def light_off(self, reason: str = "manual"):
+        return self.set_light(0, reason=reason)
+
+    @property
+    def light_brightness(self) -> int:
+        """Aktuelle Helligkeit in % (0 = aus)."""
+        return self._light_pct if self.light_is_on else 0
+
+    def _log_light(self, was_on: bool, old_pct: int, new_pct: int, reason: str,
+                   entry: Optional[str]):
         """Ereignis nur bei echter Änderung (light_off() beim Beenden/Abschalten ist oft ein No-op)."""
-        text = f"EVA Beleuchtung: {'EIN' if now_on else 'AUS'}"
-        if was_on == now_on:
+        now_on = new_pct > 0
+        old_pct = old_pct if was_on else 0
+        text = f"EVA Beleuchtung: {f'EIN {new_pct}%' if now_on else 'AUS'}"
+        if was_on == now_on and old_pct == new_pct:
             logger.debug(f"{text} (unverändert)")
             return
-        log_event(logger, logging.INFO, "light.changed", text, **{"light.on": now_on})
+        where = f", Zeitplan '{entry}'" if entry else ""
+        log_event(logger, logging.INFO, "light.changed",
+                  f"{text} (vorher {old_pct}%, Grund: {reason}{where}, "
+                  f"Dimmer: {self.dimmer.kind})",
+                  **{"light.on": now_on, "light.brightness_pct": new_pct,
+                     "light.brightness_old": old_pct, "light.reason": reason,
+                     "light.schedule_entry": entry, "light.dimmer": self.dimmer.kind})
 
     @property
     def light_is_on(self) -> bool:
@@ -760,6 +805,8 @@ class HardwareController:
             },
             "light": self._relay_states.get(
                 self.gpio_config["light_relay"], False),
+            "light_brightness_pct": self.light_brightness,
+            "light_dimmer": self.dimmer.kind,
             "level_ok": self.read_level_switch(),
             "simulation": SIMULATION,
         }
@@ -773,7 +820,7 @@ class HardwareController:
         self.fill_valve_close()
         self.ph_pump_off()
         self.chlor_pump_off()
-        self.light_off()
+        self.light_off(reason="emergency")
 
     def cleanup(self):
         """Beim Beenden: 0V sofort, DAC-Thread stoppen, 0V final, GPIO freigeben"""

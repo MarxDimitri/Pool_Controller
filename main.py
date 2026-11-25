@@ -19,6 +19,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from services.hardware import HardwareController
 from services.pump_service import PumpService
+from services.light_service import LightService
 from services.mqtt_service import MQTTService
 from services.telemetry import setup_telemetry
 from services.telegram_service import TelegramService
@@ -155,13 +156,7 @@ async def main() -> int:
         if device == "pump":
             await pump_service.handle_mqtt_command(payload)
         elif device == "light":
-            if payload == "on":
-                if pump_service.emergency_active:
-                    logger.warning("MQTT Licht EIN abgelehnt — Not-Aus aktiv")
-                    return
-                hardware.light_on()
-            elif payload == "off":
-                hardware.light_off()
+            await light_service.handle_mqtt_command(payload)
 
     mqtt = MQTTService(config, command_handler)
 
@@ -170,8 +165,12 @@ async def main() -> int:
         """Statusänderungen an MQTT publizieren"""
         if device == "pump":
             await mqtt.publish_pump_state(state)
+        elif device == "light":
+            await mqtt.publish_light_state(state)
 
     pump_service = PumpService(hardware, config, on_state_change)
+    # Beleuchtung: Zeitplan / manuell, Dimmer (vorerst simuliert)
+    light_service = LightService(hardware, config, pump_service, on_state_change)
 
     # Telemetrie liest Zustände per Callback (Metrik-Thread) — keine Aufrufe
     # aus DAC-Thread oder Zeitplan-Schleife
@@ -181,11 +180,11 @@ async def main() -> int:
 
     # Telegram (optional): Benachrichtigungen + Befehle, ruft pump_service
     # direkt auf (gleiche Sperren wie Dashboard). Verbindung nur ausgehend.
-    telegram = TelegramService(config, pump_service, hardware)
+    telegram = TelegramService(config, pump_service, hardware, light=light_service)
 
     # FastAPI App
     api_config = config.get("api", {})
-    app = create_app(pump_service, mqtt, hardware, api_config)
+    app = create_app(pump_service, mqtt, hardware, api_config, light_service=light_service)
     telemetry.instrument_fastapi(app)   # nur wenn telemetry.fastapi_instrumentation: true
     port = api_config.get("port", 8080)
 
@@ -215,6 +214,7 @@ async def main() -> int:
     mqtt_task = asyncio.create_task(mqtt.start(), name="mqtt")
     watchdog_task = asyncio.create_task(systemd_watchdog(pump_service), name="watchdog")
     telegram_task = asyncio.create_task(telegram.start(), name="telegram")
+    light_task = asyncio.create_task(light_service.start(), name="light")
 
     done, _ = await asyncio.wait({pump_task, api_task}, return_when=asyncio.FIRST_COMPLETED)
 
@@ -230,13 +230,14 @@ async def main() -> int:
     # Geordnet herunterfahren
     server.should_exit = True
     pump_service._running = False
-    for task in (pump_task, mqtt_task, watchdog_task, telegram_task):
+    light_service.stop()
+    for task in (pump_task, mqtt_task, watchdog_task, telegram_task, light_task):
         task.cancel()
     try:
         await asyncio.wait_for(api_task, timeout=5)
     except (asyncio.TimeoutError, asyncio.CancelledError, Exception):
         pass
-    await asyncio.gather(pump_task, mqtt_task, watchdog_task, telegram_task,
+    await asyncio.gather(pump_task, mqtt_task, watchdog_task, telegram_task, light_task,
                          return_exceptions=True)
     await telegram.stop(
         flush_timeout_s=3.0,

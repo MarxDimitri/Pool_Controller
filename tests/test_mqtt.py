@@ -47,7 +47,25 @@ def test_ha_discovery(config):
     m = MQTTService(config)
     c = FakeClient()
     run(m._send_ha_discovery(c))
-    assert len(c.published) == 8 and all(r for _, _, r in c.published)
+    assert len(c.published) == 10 and all(r for _, _, r in c.published)
+    cfg = {t: json.loads(p) for t, p, _ in c.published}
+    # bestehender Licht-Schalter bleibt (gleiche unique_id), jetzt mit Status
+    sw = cfg["homeassistant/switch/pool_marx_light/config"]
+    assert sw["unique_id"] == "pool_marx_light" and sw["state_topic"] == "pool_marx/light/state"
+    num = cfg["homeassistant/number/pool_marx_light_brightness/config"]
+    assert num["command_template"] == "brightness:{{ value }}" and num["command_topic"] == "pool_marx/cmd/light"
+    sel = cfg["homeassistant/select/pool_marx_light_mode/config"]
+    assert sel["options"] == ["schedule", "manual"]
+
+
+def test_publish_light_state(config):
+    m = MQTTService(config)
+    m._client = FakeClient()
+    run(m.publish_light_state({"on": True, "brightness_pct": 40, "mode": "manual"}))
+    topics = {t: (p, r) for t, p, r in m._client.published}
+    assert topics["pool_marx/light/state"] == ("on", True)
+    assert topics["pool_marx/light/brightness"] == ("40", True)
+    assert topics["pool_marx/light/mode"] == ("manual", True)
 
 
 def test_handle_message_routes_commands(config):

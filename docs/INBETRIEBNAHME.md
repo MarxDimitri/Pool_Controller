@@ -249,6 +249,7 @@ Die wichtigsten Abschnitte in `config/config.yaml`:
 | `frost` | Software-Frostschutz: Schwelle, Drehzahl, Mindestlaufzeit, `enabled`, optional `hysteresis_c` (Standard 0,5) |
 | `backwash` | Automatische Rückspülung (Tag/Uhrzeit, Dauer), `auto_enabled`, optional `ramp_timeout_sec` |
 | `mqtt` | Broker, Port, Benutzer, Topic-Präfix (Passwort → secrets.env) |
+| `lighting` | Beleuchtung: `schedule` (Zeitfenster mit `start`/`end` als `HH:MM` oder `sunset`/`sunrise`±Minuten, `brightness_pct`), `latitude`/`longitude` für Sonnenzeiten, `default_brightness_pct`, `dimmer` (`type: simulation`, `min_pct`) → Kapitel 10.1 |
 | `api` | Host und Port des Dashboards (Standard 8080) |
 | `logging` | Log-Level und Log-Datei |
 | `telemetry` | `enabled` (Standard false), `metrics_interval_s`, `log_level`, `fastapi_instrumentation`, `system_metrics` |
@@ -453,6 +454,26 @@ wiederholen (Ausgang bei 100 % muss unter 10,0 V bleiben).
   Netzspannung der Pumpe wieder zu — die Pumpe bleibt aus, bis jemand eine
   Drehzahl wählt oder den Zeitplan aktiviert.
 
+**Beleuchtung**
+
+Beide Lichtquellen hängen an einer Schaltung: Relais 7 ist der Hauptschalter,
+der Dimmer stellt die Helligkeit ein. **Der Dimmer ist noch nicht verbaut**
+(`lighting.dimmer.type: simulation`): Helligkeit wird angezeigt und gemeldet,
+die Lampen schalten aber nur an und aus.
+
+| Anzeige | Bedeutung | Wie verlassen |
+|---|---|---|
+| 📅 Zeitplan | An/Aus und Helligkeit laut `lighting.schedule`, außerhalb aller Zeitfenster aus. Das Dashboard zeigt den nächsten Wechsel. | Schalter, Regler oder Stufe → Manuell |
+| ✋ Manuell | Vom Benutzer gesetzt, Zeitplan pausiert — auch über Nacht | **Licht zurück zum Zeitplan** |
+
+- Zeitfenster dürfen über Mitternacht gehen. Überschneiden sie sich, gilt das erste.
+- `sunset`/`sunrise` brauchen `lighting.latitude`/`longitude`; ohne Koordinaten
+  werden solche Einträge mit Warnung ignoriert.
+- Helligkeiten unter `dimmer.min_pct` (Standard 10 %) werden auf diesen Wert angehoben.
+- „Alles abschalten“ schaltet das Licht aus. Bis zum Quittieren kann es weder
+  der Zeitplan noch ein Befehl wieder einschalten, Ausschalten geht immer.
+  Nach dem Quittieren folgt das Licht wieder seinem Modus.
+
 ### 10.2 API für Skripte
 
 Alle Routen außer `/api/health`, `/api/session` und `/api/login` brauchen eine
@@ -476,7 +497,10 @@ curl -X POST -H "Authorization: Bearer $PW" http://<pi-ip>:8080/api/pump/schedul
 | `POST /api/pump/fault-note` `{"text": "E-04"}` | Pumpenfehler mit aktuellem Status ins Log schreiben (Text optional, max. 500 Zeichen) |
 | `POST /api/backwash/start` | Rückspülung starten |
 | `POST /api/backwash/cancel?resume_schedule=true` | Rückspülung abbrechen |
-| `POST /api/light` `{"action":"on"\|"off"}` | Beleuchtung |
+| `GET /api/light` | Beleuchtung: an/aus, Helligkeit, Modus, Zeitplaneintrag, nächster Wechsel |
+| `POST /api/light` `{"action":"on", "brightness_pct": 60}` | `on` (optional mit Helligkeit), `off`, `brightness`, `manual` (Zeitplan pausieren), `schedule` |
+| `POST /api/light/brightness/{0-100}` | Helligkeit setzen, 0 = aus (Modus Manuell) |
+| `POST /api/light/schedule` | Licht zurück zum Zeitplan |
 | `POST /api/emergency_stop` | Alles abschalten (verriegelt) |
 | `POST /api/emergency/ack` | Quittieren (Alias: `POST /api/pump/mains/restore`) |
 | `GET /api/pump/mains` | Zustand des Pumpenrelais |
@@ -501,7 +525,10 @@ Den geplanten A/B-Test beschreibt [abnahme.md](abnahme.md), Abschnitt C5.
 ### 10.4 MQTT (optional)
 
 Befehle an `pool_marx/cmd/pump`: `on`, `off`, `speed:60`, `backwash`, `schedule`;
-an `pool_marx/cmd/light`: `on`, `off`. Status unter `pool_marx/pump/…`.
+an `pool_marx/cmd/light`: `on`, `off`, `brightness:60`, `schedule`, `manual`.
+Status unter `pool_marx/pump/…` und `pool_marx/light/state|brightness|mode`.
+Home Assistant bekommt dafür zusätzlich „Pool Beleuchtung Helligkeit“ und
+„Pool Beleuchtung Modus“; der bisherige Schalter bleibt.
 Mosquitto sollte nur auf `127.0.0.1` lauschen und anonyme Zugriffe verbieten.
 
 ### 10.5 Telegram (optional)

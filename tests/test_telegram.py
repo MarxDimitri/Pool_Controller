@@ -625,7 +625,7 @@ def test_real_pump_and_light_changes_end_up_silent_in_outbox(bot, info_logs):
     finally:
         root.removeHandler(h)
     lines = list(svc._outbox)
-    assert [t.split(" ", 2)[2] for t, _ in lines] == ["Pumpe 0 → 60 % (manuell)", "Licht an"]
+    assert [t.split(" ", 2)[2] for t, _ in lines] == ["Pumpe 0 → 60 % (manuell)", "Licht an, 80 % (manuell)"]
     assert all(silent for _, silent in lines)
 
 

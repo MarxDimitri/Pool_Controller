@@ -335,6 +335,8 @@ class OTelTelemetry(Telemetry):
         gauge("pool.pump.mode", "1", "Aktueller Pumpenmodus (1 = aktiv)", self._obs_mode)
         gauge("pool.pump.mains_connected", "1", "Pumpe hat Netzspannung (Relais)", self._obs_mains)
         gauge("pool.light.on", "1", "Beleuchtung an", self._obs_light)
+        gauge("pool.light.brightness", "%", "Helligkeit der Beleuchtung (0 = aus)",
+              self._obs_light_brightness)
         gauge("pool.level.ok", "1", "Wasserstand OK", self._obs_level)
         gauge("pool.frost.active", "1", "Frostschutz aktiv", self._obs_frost)
         gauge("pool.pump.min_speed_active", "1", "Mindestdrehzahl ersetzt Zeitplan-0%", self._obs_min_speed)
@@ -394,6 +396,10 @@ class OTelTelemetry(Telemetry):
     def _obs_light(self):
         hw = self._hardware
         return [self._o(int(hw.light_is_on))] if hw is not None else []
+
+    def _obs_light_brightness(self):
+        hw = self._hardware
+        return [self._o(int(hw.light_brightness))] if hw is not None else []
 
     def _obs_level(self):
         hw = self._hardware

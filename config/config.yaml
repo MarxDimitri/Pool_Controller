@@ -110,11 +110,32 @@ chemistry:
   max_dose_ml: 100            # Max Dosiermenge pro Zyklus
 
 # ── Beleuchtung ───────────────────────────────────────────────
+# Beide Lichtquellen hängen an einer Schaltung: Relais 7 (gpio.light_relay)
+# ist der Hauptschalter, der Dimmer stellt die Helligkeit ein.
+# Modus "Zeitplan": Licht folgt lighting.schedule, außerhalb aller Fenster aus.
+# Jeder manuelle Befehl (Dashboard, API, MQTT, Telegram) schaltet auf
+# "manuell" — bis "Zurück zum Zeitplan".
 lighting:
-  auto_sunset: true           # Automatisch bei Sonnenuntergang ein
-  off_time: "23:00"           # Automatisch um 23:00 aus
-  latitude: 0.0               # eigene Koordinaten eintragen (für auto_sunset)
+  # Für start/end "sunset"/"sunrise": eigene Koordinaten eintragen.
+  # 0.0/0.0 = nicht gesetzt → Einträge mit Sonnenzeiten werden ignoriert.
+  latitude: 0.0
   longitude: 0.0
+  default_brightness_pct: 80  # "Licht an" ohne Wert, solange noch keine Helligkeit genutzt wurde
+  dimmer:
+    type: "simulation"        # Dimmer noch nicht verbaut — Helligkeit wird nur simuliert
+    min_pct: 10               # kleinste Helligkeit, die der Dimmer sauber kann
+  # Zeitfenster: start/end "HH:MM" oder "sunset"/"sunrise" mit Versatz in
+  # Minuten ("sunset+30", "sunrise-15"). Über Mitternacht erlaubt.
+  # Überschneiden sich Fenster, gilt das erste.
+  schedule:
+    - name: "Abend"
+      start: "20:30"          # mit Koordinaten z. B. "sunset"
+      end: "22:30"
+      brightness_pct: 80
+    - name: "Spätabend"
+      start: "22:30"
+      end: "23:30"
+      brightness_pct: 30
 
 # ── MQTT ─────────────────────────────────────────────────────
 mqtt:

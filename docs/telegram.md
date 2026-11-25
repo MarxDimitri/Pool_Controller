@@ -119,7 +119,9 @@ die Nachricht. Zustandsänderungen setzen `logging.level: INFO` voraus (Standard
 | `/pumpe 60 30` | 60 % für 30 Minuten; `/pumpe 60 0` ohne Zeitlimit |
 | `/aus` | Pumpe aus (0 %), Zeitlimit wie oben; `/aus 0` ohne Zeitlimit |
 | `/zeitplan` | Zurück zum Zeitplan |
-| `/licht an`, `/licht aus` | Beleuchtung |
+| `/licht an`, `/licht aus` | Beleuchtung (`/licht an 40` mit Helligkeit); schaltet auf manuell |
+| `/licht 40` | Helligkeit in % (0 = aus), schaltet auf manuell |
+| `/licht zeitplan` | Licht zurück zum Zeitplan |
 | `/rueckspuelen` | Rückspülung, **nach Bestätigung** per Knopf |
 | `/abschalten` | Alles abschalten und verriegeln (wie im Dashboard), **nach Bestätigung** |
 | `/notiz E-04` | Pumpenfehler mit aktuellem Status ins Log (wie im Dashboard) |

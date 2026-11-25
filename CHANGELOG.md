@@ -12,6 +12,40 @@ Neue Einträge kommen unter **[Unreleased]**. `release/release.py` macht daraus 
 
 ## [Unreleased]
 
+### Added
+- Beleuchtung mit eigenem Zeitplan (`lighting.schedule`): Zeitfenster mit `start`/`end` als `HH:MM`
+  oder `sunset`/`sunrise` ± Minuten (braucht `lighting.latitude`/`longitude`), Helligkeit pro Fenster,
+  auch über Mitternacht. Außerhalb aller Fenster ist das Licht aus.
+- Modus Zeitplan / Manuell für das Licht: Jeder manuelle Befehl pausiert den Zeitplan, bis
+  „Licht zurück zum Zeitplan“ gewählt wird.
+- Dimmbare Beleuchtung (beide Lichtquellen an einer Schaltung). Der Dimmer ist noch nicht verbaut:
+  `lighting.dimmer.type: simulation` merkt sich die Helligkeit, die Lampen schalten nur an/aus.
+  Neue Dimmer kommen als Klasse in `services/dimmer.py` dazu.
+- Dashboard: Lichtkarte mit Modus, Helligkeitsregler, Stufen (Aus/30/60/100 %), nächstem
+  Zeitplan-Wechsel, „Licht zurück zum Zeitplan“ und Hinweis „Dimmer simuliert“.
+- API: `GET /api/light`, `POST /api/light/brightness/{0-100}`, `POST /api/light/schedule`;
+  `POST /api/light` kennt zusätzlich `brightness_pct` und die Aktionen `brightness`, `manual`, `schedule`.
+  `/api/status` und der WebSocket-Zustand enthalten `light`.
+- MQTT: Befehle `brightness:NN`, `schedule`, `manual` an `pool_marx/cmd/light`; Status unter
+  `pool_marx/light/state|brightness|mode`. Home Assistant: neue Entitäten „Pool Beleuchtung Helligkeit“
+  und „Pool Beleuchtung Modus“, der Schalter „Pool Beleuchtung“ zeigt jetzt seinen Zustand.
+- Telegram: `/licht 40`, `/licht an 40`, `/licht zeitplan`; `/status` zeigt Licht mit Helligkeit,
+  Modus und nächstem Wechsel; Meldungen wie `Licht 80 → 30 % (Zeitplan „Spätabend“)`.
+- Telemetrie: Metrik `pool.light.brightness`; Ereignis `light.schedule_transition`.
+
+### Changed
+- `light.changed` enthält Helligkeit, vorherige Helligkeit, Grund und Zeitplaneintrag.
+- `lighting.auto_sunset` und `lighting.off_time` (waren nie umgesetzt) werden nicht mehr gelesen;
+  stehen sie in der Config, kommt eine Warnung mit Hinweis auf `lighting.schedule`.
+
+### Einmalig beim Update auf dem Pi
+Ohne diese Schritte gibt es keinen Licht-Zeitplan: Das Licht ist im Modus Zeitplan aus und
+lässt sich wie bisher manuell schalten.
+1. Abschnitt `lighting:` aus `config/config.yaml` in die `config.yaml` auf dem Pi übernehmen
+   (alte Schlüssel `auto_sunset`/`off_time` löschen), Zeitfenster anpassen
+2. Für `sunset`/`sunrise`: `latitude`/`longitude` eintragen
+3. Dienst neu starten, im Log `Beleuchtung: … Zeitplan-Einträge` prüfen
+
 ## [1.4.0] - 2026-11-25
 
 ### Added

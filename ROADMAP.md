@@ -188,6 +188,11 @@ auf den EEPROM-Startwert (≈ 50 %).
 - [ ] `max_fill_minutes` zusätzlich als Hardware-Zeitrelais (Wasserschaden bei hängender Software)
 - [ ] Drahtbruchverhalten des Schwimmerschalters bewusst festlegen
 
+### 🔵 Beleuchtung / Dimmer
+- [ ] Dimmer-Hardware festlegen (beide EVA-Treiber an einer Schaltung): z. B. PWM-Dimmer am GPIO oder 1–10 V/0–10 V über einen zweiten DAC — muss zum SELV-Treiber passen
+- [ ] Treiber-Klasse in `services/dimmer.py` ergänzen (gleiche Schnittstelle wie `SimulatedDimmer`), `lighting.dimmer.type` umstellen
+- [ ] `dimmer.min_pct` an der echten Hardware ermitteln (kleinste Stufe ohne Flackern)
+
 ### 🔵 Elektrik / Abnahme
 - [ ] DIN VDE 0100-702: RCD 30 mA, Potentialausgleich, Schaltschrank außerhalb Bereich 0/1
 - [ ] Beleuchtung: EVA-Treiber ist SELV — Installation der Leuchte gem. Bereichen prüfen

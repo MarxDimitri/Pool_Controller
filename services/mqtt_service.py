@@ -112,6 +112,11 @@ class MQTTService:
         await self.publish("pump/mode",    state["mode"])
         await self.publish("pump/frost",   state["frost_active"])
 
+    async def publish_light_state(self, state: dict):
+        await self.publish("light/state", "on" if state["on"] else "off", retain=True)
+        await self.publish("light/brightness", state["brightness_pct"], retain=True)
+        await self.publish("light/mode", state["mode"], retain=True)
+
     async def publish_temperature(self, temp_c: float):
         await self.publish("temperature", f"{temp_c:.1f}")
 
@@ -240,16 +245,51 @@ class MQTTService:
             retain=True
         )
 
-        # Beleuchtung — Switch
+        # Beleuchtung — Switch (unverändert, jetzt mit Status)
         await client.publish(
             f"{base}/switch/{prefix}_light/config",
             json.dumps({
                 "name": "Pool Beleuchtung",
                 "unique_id": f"{prefix}_light",
+                "state_topic": f"{prefix}/light/state",
                 "command_topic": f"{prefix}/cmd/light",
                 "payload_on": "on",
                 "payload_off": "off",
                 "icon": "mdi:lightbulb-on",
+                "device": self._ha_device()
+            }),
+            retain=True
+        )
+
+        # Beleuchtung Helligkeit — Number (Dimmer)
+        await client.publish(
+            f"{base}/number/{prefix}_light_brightness/config",
+            json.dumps({
+                "name": "Pool Beleuchtung Helligkeit",
+                "unique_id": f"{prefix}_light_brightness",
+                "state_topic": f"{prefix}/light/brightness",
+                "command_topic": f"{prefix}/cmd/light",
+                "command_template": "brightness:{{ value }}",
+                "min": 0,
+                "max": 100,
+                "step": 5,
+                "unit_of_measurement": "%",
+                "icon": "mdi:brightness-6",
+                "device": self._ha_device()
+            }),
+            retain=True
+        )
+
+        # Beleuchtung Modus — Select (Zeitplan / manuell)
+        await client.publish(
+            f"{base}/select/{prefix}_light_mode/config",
+            json.dumps({
+                "name": "Pool Beleuchtung Modus",
+                "unique_id": f"{prefix}_light_mode",
+                "state_topic": f"{prefix}/light/mode",
+                "command_topic": f"{prefix}/cmd/light",
+                "options": ["schedule", "manual"],
+                "icon": "mdi:calendar-clock",
                 "device": self._ha_device()
             }),
             retain=True

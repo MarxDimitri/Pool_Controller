@@ -21,6 +21,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from services.light_service import LightService
 from services.pump_service import BackwashBusy, EmergencyActive
 from services.version import __version__
 
@@ -45,7 +46,8 @@ class FaultNote(BaseModel):
     text: Optional[str] = Field(None, max_length=5000)
 
 class LightCommand(BaseModel):
-    action: str           # "on", "off"
+    action: str           # "on", "off", "brightness", "schedule", "manual"
+    brightness_pct: Optional[int] = Field(None, ge=0, le=100)
 
 class LoginRequest(BaseModel):
     password: str
@@ -87,8 +89,11 @@ manager = ConnectionManager()
 STATE_WATCH_INTERVAL_S = 1.0
 
 
-def create_app(pump_service, mqtt_service, hardware, api_config: Optional[dict] = None) -> FastAPI:
+def create_app(pump_service, mqtt_service, hardware, api_config: Optional[dict] = None,
+               light_service: Optional[LightService] = None) -> FastAPI:
     """FastAPI App mit allen Pool-Routen erstellen"""
+    if light_service is None:   # ohne Zeitplan (Tests, Skripte): nur manuelle Befehle
+        light_service = LightService(hardware, {}, pump_service)
 
     # ── Authentifizierung ─────────────────────────────────────
     # Passwort = POOL_API_SECRET (Umgebung, siehe main.py). Login setzt ein HttpOnly-
@@ -147,6 +152,7 @@ def create_app(pump_service, mqtt_service, hardware, api_config: Optional[dict] 
             "hardware": hardware.get_all_states(),
             "mains": hardware.pump_mains_connected,
             "protection": pump_service.protection_status(),
+            "light": light_service.get_state(),
         }
 
     last_pushed: dict = {}
@@ -244,6 +250,7 @@ def create_app(pump_service, mqtt_service, hardware, api_config: Optional[dict] 
             "pump": pump_state,
             "hardware": hw_state,
             "protection": pump_service.protection_status(),
+            "light": light_service.get_state(),
             "pool": {
                 "name": "Pool Marx",
                 "volume_m3": 42,
@@ -319,20 +326,54 @@ def create_app(pump_service, mqtt_service, hardware, api_config: Optional[dict] 
 
     # ── Beleuchtung ───────────────────────────────────────────
 
+    def light_response() -> dict:
+        state = light_service.get_state()
+        return {"success": True, "light": state["on"], "state": state}
+
+    @app.get("/api/light", dependencies=auth)
+    async def get_light():
+        """Beleuchtung: an/aus, Helligkeit, Modus, nächste Zeitplan-Änderung"""
+        return light_service.get_state()
+
     @app.post("/api/light", dependencies=auth)
     async def control_light(cmd: LightCommand):
-        """EVA Beleuchtung steuern"""
-        if cmd.action == "on":
-            if pump_service.emergency_active:
-                raise EmergencyActive("Not-Aus aktiv — erst quittieren")
-            hardware.light_on()
-        elif cmd.action == "off":
-            hardware.light_off()
-        else:
-            raise HTTPException(400, f"Unbekannte Aktion: {cmd.action}")
-        state = hardware.get_all_states()
+        """
+        Beleuchtung steuern. on/off/brightness schalten auf manuell,
+        schedule → zurück zum Zeitplan, manual → Zeitplan pausieren.
+        """
+        try:
+            if cmd.action == "on":
+                light_service.turn_on(cmd.brightness_pct)
+            elif cmd.action == "off":
+                light_service.turn_off()
+            elif cmd.action == "brightness":
+                if cmd.brightness_pct is None:
+                    raise HTTPException(400, "brightness_pct fehlt")
+                light_service.set_brightness(cmd.brightness_pct)
+            elif cmd.action == "schedule":
+                light_service.resume_schedule()
+            elif cmd.action == "manual":
+                light_service.set_manual()
+            else:
+                raise HTTPException(400, f"Unbekannte Aktion: {cmd.action}")
+        except ValueError as e:
+            raise HTTPException(400, str(e))
         await push_state()
-        return {"success": True, "light": state["light"]}
+        return light_response()
+
+    @app.post("/api/light/brightness/{pct}", dependencies=auth)
+    async def light_brightness(pct: int = ApiPath(..., ge=0, le=100)):
+        """Helligkeit 0–100 % (0 = aus), schaltet auf manuell"""
+        light_service.set_brightness(pct)
+        await push_state()
+        return light_response()
+
+    @app.post("/api/light/schedule", dependencies=auth)
+    async def light_schedule():
+        """Beleuchtung zurück zum Zeitplan"""
+        light_service.resume_schedule()
+        await push_state()
+        return light_response()
 
     # ── Not-Aus (Software, verriegelt) ────────────────────────
 

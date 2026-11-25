@@ -161,6 +161,10 @@
 
   .divider{height:1px; background:var(--border); margin:16px 0;}
 
+  .light-pct{color:var(--text-muted); font-weight:700; font-size:15px;}
+  .light-info{font-size:13px; color:var(--text-muted); margin-top:12px; text-align:center;}
+  .light-note{font-size:12px; color:var(--text-muted); margin-top:10px; text-align:center; font-style:italic;}
+
   footer{text-align:center; color:var(--text-muted); font-size:12px; margin-top:24px;}
 
   .toast{
@@ -235,13 +239,30 @@
 
   <!-- Beleuchtung -->
   <div class="card">
-    <h2>Beleuchtung</h2>
+    <div class="status-row">
+      <h2 style="margin:0;">Beleuchtung</h2>
+      <span class="badge gray" id="lightModeBadge">–</span>
+    </div>
     <div class="toggle-row">
-      <span class="label">💡 Pool-Beleuchtung</span>
+      <span class="label">💡 Pool-Beleuchtung <span class="light-pct" id="lightPct"></span></span>
       <label class="switch">
-        <input type="checkbox" id="lightToggle">
+        <input type="checkbox" id="lightToggle" aria-label="Beleuchtung an/aus">
         <span class="slider-toggle"></span>
       </label>
+    </div>
+    <input type="range" id="lightSlider" min="0" max="100" step="5" value="0" aria-label="Helligkeit">
+    <div class="presets">
+      <button class="preset-btn" data-light="0">Aus<small>0%</small></button>
+      <button class="preset-btn" data-light="30">Gedimmt<small>30%</small></button>
+      <button class="preset-btn" data-light="60">Mittel<small>60%</small></button>
+      <button class="preset-btn" data-light="100">Hell<small>100%</small></button>
+    </div>
+    <div class="light-info" id="lightInfo"></div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="btnLightSchedule">📅 Licht zurück zum Zeitplan</button>
+    </div>
+    <div class="light-note" id="lightNote" style="display:none;">
+      Dimmer noch nicht verbaut – die Helligkeit wird simuliert, die Lampen schalten nur an und aus.
     </div>
   </div>
 
@@ -298,6 +319,12 @@ const els = {
   speedFill: document.getElementById("speedFill"),
   speedSlider: document.getElementById("speedSlider"),
   lightToggle: document.getElementById("lightToggle"),
+  lightSlider: document.getElementById("lightSlider"),
+  lightPct: document.getElementById("lightPct"),
+  lightModeBadge: document.getElementById("lightModeBadge"),
+  lightInfo: document.getElementById("lightInfo"),
+  lightNote: document.getElementById("lightNote"),
+  btnLightSchedule: document.getElementById("btnLightSchedule"),
   levelVal: document.getElementById("levelVal"),
   mainsVal: document.getElementById("mainsVal"),
   banners: document.getElementById("banners"),
@@ -314,7 +341,9 @@ const els = {
   logoutLink: document.getElementById("logoutLink"),
 };
 
-let state = { pump: null, hardware: null, mains: null };
+let state = { pump: null, hardware: null, mains: null, light: null };
+let lightDirty = false;
+let lightTimer = null;
 let sliderDirty = false;
 let sliderTimer = null;
 
@@ -362,7 +391,7 @@ function renderPump(p){
   els.speedFill.style.width = p.speed_pct + "%";
   if(!sliderDirty) els.speedSlider.value = p.speed_pct;
 
-  document.querySelectorAll(".preset-btn").forEach(btn=>{
+  document.querySelectorAll(".preset-btn[data-speed]").forEach(btn=>{
     btn.classList.toggle("active", Number(btn.dataset.speed) === p.speed_pct);
   });
 
@@ -373,15 +402,14 @@ function renderPump(p){
   els.btnBackwash.disabled = locked;
   els.btnBackwash.textContent = backwash ? "⏹ Rückspülung abbrechen" : "🔄 Rückspülung starten";
   els.speedSlider.disabled = locked || backwash;
-  els.lightToggle.disabled = locked;
-  document.querySelectorAll(".preset-btn").forEach(btn=>{ btn.disabled = locked || backwash; });
+  applyLightLock();
+  document.querySelectorAll(".preset-btn[data-speed]").forEach(btn=>{ btn.disabled = locked || backwash; });
   renderBanners();
 }
 
 function renderHardware(hw){
   if(!hw) return;
   state.hardware = hw;
-  els.lightToggle.checked = !!hw.light;
   els.levelVal.textContent = hw.level_ok ? "OK" : "Niedrig ⚠️";
   els.levelVal.parentElement.style.background = hw.level_ok ? "" : "#fee2e2";
   els.simTag.textContent = hw.simulation ? "Simulationsmodus" : "";
@@ -391,6 +419,64 @@ function renderHardware(hw){
       (Math.abs(a - t) < 0.5 ? `Ist ${Math.round(a)} %` : `Ist ${Math.round(a)} % → Rampe auf ${t} %`)
       + (hw.dac && hw.dac.write_errors ? ` · DAC-Fehler: ${hw.dac.write_errors}` : "");
   }
+}
+
+const LIGHT_MODE = {
+  schedule: ["📅 Zeitplan", "blue"],
+  manual:   ["✋ Manuell", "amber"],
+};
+
+function fmtTime(iso){
+  const t = new Date(iso), now = new Date();
+  const hm = t.toLocaleTimeString("de-DE", {hour:"2-digit", minute:"2-digit"});
+  const tomorrow = new Date(now); tomorrow.setDate(now.getDate() + 1);
+  if(t.toDateString() === now.toDateString()) return hm;
+  if(t.toDateString() === tomorrow.toDateString()) return "morgen " + hm;
+  return t.toLocaleDateString("de-DE", {day:"2-digit", month:"2-digit"}) + " " + hm;
+}
+
+function applyLightLock(){
+  const locked = !!(state.pump && state.pump.mode === "emergency");
+  const l = state.light;
+  els.lightToggle.disabled = locked;
+  els.lightSlider.disabled = locked;
+  document.querySelectorAll(".preset-btn[data-light]").forEach(b=>{ b.disabled = locked; });
+  els.btnLightSchedule.disabled = locked || !l || l.mode === "schedule";
+}
+
+function renderLight(l){
+  if(!l) return;
+  state.light = l;
+  const [label, color] = LIGHT_MODE[l.mode] || [l.mode, "gray"];
+  els.lightModeBadge.textContent = label;
+  els.lightModeBadge.className = "badge " + color;
+  els.lightToggle.checked = !!l.on;
+  if(!lightDirty){
+    els.lightSlider.value = l.brightness_pct;
+    els.lightPct.textContent = l.on ? `${l.brightness_pct} %` : "aus";
+  }
+  document.querySelectorAll(".preset-btn[data-light]").forEach(b=>{
+    b.classList.toggle("active", Number(b.dataset.light) === l.brightness_pct);
+  });
+  let info;
+  if(l.mode === "manual"){
+    info = "Manuell – Zeitplan pausiert";
+  }else if(!l.schedule_entries){
+    info = "Kein Zeitplan konfiguriert (lighting.schedule)";
+  }else{
+    info = l.schedule_entry ? `Zeitplan „${l.schedule_entry}“` : "Zeitplan: gerade kein Zeitfenster";
+    const n = l.next_change;
+    if(n) info += ` · ${fmtTime(n.time)} → ${n.brightness_pct ? n.brightness_pct + " %" : "aus"}`;
+  }
+  els.lightInfo.textContent = info;
+  els.lightNote.style.display = l.dimmer === "simulation" ? "" : "none";
+  applyLightLock();
+}
+
+async function lightCommand(path, body){
+  const res = await api(path, {method:"POST", body: body ? JSON.stringify(body) : undefined});
+  if(res && res.state) renderLight(res.state);
+  return res;
 }
 
 function renderMains(m){
@@ -472,6 +558,7 @@ async function loadInitial(){
     renderPump(status.pump);
     renderHardware(status.hardware);
     renderProtection(status.protection);
+    renderLight(status.light);
     if(status.version) document.getElementById("versionTag").textContent = "v" + status.version;
     if(status.pool) els.poolMeta && (document.getElementById("poolMeta").textContent =
       `${status.pool.volume_m3} m³ · ${status.pool.name}`);
@@ -508,6 +595,7 @@ function connectWS(){
         renderHardware(msg.data.hardware);
         renderMains(msg.data.mains);
         renderProtection(msg.data.protection);
+        renderLight(msg.data.light);
       }else if(msg.type === "emergency_stop"){
         toast("NOT-AUS ausgelöst");
       }
@@ -523,7 +611,7 @@ els.btnFaultNote.addEventListener("click", async ()=>{
   if(res) toast("Fehlernotiz im Log gespeichert");
 });
 
-document.querySelectorAll(".preset-btn").forEach(btn=>{
+document.querySelectorAll(".preset-btn[data-speed]").forEach(btn=>{
   btn.addEventListener("click", async ()=>{
     const speed = Number(btn.dataset.speed);
     const res = await api(`/api/pump/speed/${speed}`, {method:"POST"});
@@ -571,8 +659,28 @@ els.btnBackwash.addEventListener("click", async ()=>{
 
 els.lightToggle.addEventListener("change", async ()=>{
   const action = els.lightToggle.checked ? "on" : "off";
-  const res = await api("/api/light", {method:"POST", body: JSON.stringify({action})});
+  const res = await lightCommand("/api/light", {action});
   if(!res) els.lightToggle.checked = !els.lightToggle.checked;
+});
+
+els.lightSlider.addEventListener("input", ()=>{
+  lightDirty = true;
+  const v = Number(els.lightSlider.value);
+  els.lightPct.textContent = v ? `${v} %` : "aus";
+  clearTimeout(lightTimer);
+  lightTimer = setTimeout(async ()=>{
+    await lightCommand(`/api/light/brightness/${Number(els.lightSlider.value)}`);
+    lightDirty = false;
+  }, 450);
+});
+
+document.querySelectorAll(".preset-btn[data-light]").forEach(btn=>{
+  btn.addEventListener("click", ()=> lightCommand(`/api/light/brightness/${Number(btn.dataset.light)}`));
+});
+
+els.btnLightSchedule.addEventListener("click", async ()=>{
+  const res = await lightCommand("/api/light/schedule");
+  if(res) toast("Licht folgt wieder dem Zeitplan");
 });
 
 els.btnEstop.addEventListener("click", async ()=>{

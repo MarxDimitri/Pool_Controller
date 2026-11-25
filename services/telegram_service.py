@@ -99,7 +99,9 @@ HELP_TEXT = (
     "/pumpe 60 30 — Drehzahl für 30 Minuten (0 = ohne Zeitlimit)\n"
     "/aus — Pumpe aus (zurück zum Zeitplan nach {dur})\n"
     "/zeitplan — zurück zum Zeitplan\n"
-    "/licht an | /licht aus\n"
+    "/licht an | /licht aus — Licht (Zeitplan pausiert)\n"
+    "/licht 40 — Helligkeit in %\n"
+    "/licht zeitplan — Licht zurück zum Zeitplan\n"
     "/rueckspuelen — Rückspülung starten (mit Bestätigung)\n"
     "/abschalten — alles abschalten und verriegeln (mit Bestätigung)\n"
     "/notiz <Text> — Pumpenfehler notieren (z. B. E-04)\n"
@@ -353,6 +355,7 @@ class TelegramService:
     """
 
     def __init__(self, config: dict, pump_service, hardware, *,
+                 light=None,
                  api: Optional[ApiCall] = None,
                  clock: Callable[[], float] = time.time,
                  monotonic: Callable[[], float] = time.monotonic,
@@ -360,6 +363,10 @@ class TelegramService:
         self.cfg = load_telegram_config(config)
         self.pump = pump_service
         self.hw = hardware
+        if light is None:   # ohne Zeitplan: nur manuelle Befehle
+            from .light_service import LightService
+            light = LightService(hardware, {}, pump_service)
+        self.light = light
         self._token = ((config or {}).get("telegram") or {}).get("token") or ""
         self._api = api
         self._clock = clock
@@ -623,7 +630,19 @@ class TelegramService:
                     why += f" „{entry}“"
             return f"Pumpe {old:g} → {new:g} % ({why})"
         if event == "light.changed":
-            return "Licht an" if attr("light.on") else "Licht aus"
+            pct, old = attr("light.brightness_pct"), attr("light.brightness_old")
+            reason = attr("light.reason")
+            why = REASON_NAMES.get(reason, reason) if reason else None
+            if why and attr("light.schedule_entry"):
+                why += f" „{attr('light.schedule_entry')}“"
+            suffix = f" ({why})" if why else ""
+            if not attr("light.on"):
+                return f"Licht aus{suffix}"
+            if pct is None:
+                return f"Licht an{suffix}"
+            if not old:
+                return f"Licht an, {pct} %{suffix}"
+            return f"Licht {old} → {pct} %{suffix}"
         if event == "backwash.started":
             return f"Rückspülung startet ({attr('backwash.speed_pct')} %)"
         if event == "backwash.finished":
@@ -848,16 +867,30 @@ class TelegramService:
                 self.pump.resume_schedule()
                 return f"Zurück zum Zeitplan.\n{self._pump_line()}", None
             if cmd == "licht":
-                arg = args[0].lower() if args else ""
+                arg = args[0].lower().rstrip("%") if args else ""
+                usage = "Aufruf: /licht an | /licht aus | /licht 0–100 | /licht zeitplan"
                 if arg in ("an", "ein", "on"):
-                    if self.pump.emergency_active:
-                        raise EmergencyActive("Not-Aus aktiv")
-                    self.hw.light_on()
-                    return "Licht an.", None
-                if arg in ("aus", "off"):
-                    self.hw.light_off()
-                    return "Licht aus.", None
-                return "Aufruf: /licht an | /licht aus", None
+                    pct = None
+                    if len(args) > 1:
+                        try:
+                            pct = int(args[1].rstrip("%"))
+                            if not 1 <= pct <= 100:
+                                raise ValueError
+                        except ValueError:
+                            return usage, None
+                    self.light.turn_on(pct)
+                elif arg in ("aus", "off"):
+                    self.light.turn_off()
+                elif arg.isdigit():
+                    if not 0 <= int(arg) <= 100:
+                        return usage, None
+                    self.light.set_brightness(int(arg))
+                elif arg in ("zeitplan", "schedule", "auto"):
+                    self.light.resume_schedule()
+                    return f"Licht zurück zum Zeitplan.\n{self._light_line()}", None
+                else:
+                    return usage, None
+                return f"{self._light_line()}\nZeitplan pausiert — zurück mit /licht zeitplan.", None
             if cmd in ("rueckspuelen", "rückspülen"):
                 if self.pump.emergency_active:
                     raise EmergencyActive("Not-Aus aktiv")
@@ -920,6 +953,23 @@ class TelegramService:
             mode += f" „{s['schedule_entry']}“"
         return f"Pumpe: Soll {s['setpoint_pct']:g} %, Ist {s['actual_pct']:g} % — {mode}"
 
+    def _light_line(self) -> str:
+        st = self.light.get_state()
+        what = f"an, {st['brightness_pct']} %" if st["on"] else "aus"
+        if st["mode"] == "manual":
+            how = "manuell"
+        else:
+            how = "Zeitplan" + (f" „{st['schedule_entry']}“" if st["schedule_entry"] else "")
+            nxt = st.get("next_change")
+            if nxt:
+                at = datetime.fromisoformat(nxt["time"])
+                today = self.light._now().date()
+                day = "" if at.date() == today else f"{at:%d.%m.} "
+                to = f"{nxt['brightness_pct']} %" if nxt["brightness_pct"] else "aus"
+                how += f", {day}{at:%H:%M} → {to}"
+        sim = " (Dimmer simuliert)" if st["dimmer"] == "simulation" and st["on"] else ""
+        return f"Licht: {what}{sim} — {how}"
+
     def status_text(self) -> str:
         try:
             s = self.pump.pump_status_summary()
@@ -931,8 +981,8 @@ class TelegramService:
                 lines.append("🛑 NOT-AUS aktiv — quittieren nur am Dashboard im LAN")
             lines.append(self._pump_line())
             lines.append(f"Netz Pumpe: {'ein' if s['mains_connected'] else 'AUS'} · "
-                         f"Licht: {'an' if hw['light'] else 'aus'} · "
                          f"Wasserstand: {'ok' if hw['level_ok'] else 'NIEDRIG'}")
+            lines.append(self._light_line())
             lines.append(f"Frostschutz: {FROST_NAMES.get(frost['state'], frost['state'])} "
                          f"(< {frost['threshold_c']} °C) · Winterbetrieb: "
                          f"{MIN_SPEED_NAMES.get(ms['state'], ms['state'])}")
@@ -956,7 +1006,8 @@ class TelegramService:
         commands = [
             ("status", "Aktueller Zustand"), ("pumpe", "Drehzahl in %, z. B. /pumpe 60"),
             ("aus", "Pumpe aus"), ("zeitplan", "Zurück zum Zeitplan"),
-            ("licht", "/licht an oder /licht aus"), ("rueckspuelen", "Rückspülung starten"),
+            ("licht", "an, aus, Helligkeit (z. B. 40) oder zeitplan"),
+            ("rueckspuelen", "Rückspülung starten"),
             ("abschalten", "Alles abschalten und verriegeln"),
             ("notiz", "Pumpenfehler notieren"),
             ("stumm", "Statusmeldungen aus, z. B. /stumm 3 (Stunden)"),
