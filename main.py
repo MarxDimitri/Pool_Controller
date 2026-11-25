@@ -21,6 +21,7 @@ from services.hardware import HardwareController
 from services.pump_service import PumpService
 from services.mqtt_service import MQTTService
 from services.telemetry import setup_telemetry
+from services.telegram_service import TelegramService
 from services.version import __version__
 from api.main import create_app
 
@@ -96,6 +97,7 @@ async def systemd_watchdog(pump_service, max_heartbeat_age_s: float = 180):
 SECRET_ENV = {
     ("mqtt", "password"):   "POOL_MQTT_PASSWORD",
     ("api",  "secret_key"): "POOL_API_SECRET",
+    ("telegram", "token"):  "POOL_TELEGRAM_TOKEN",
 }
 OPTIONAL_ENV = {
     ("mqtt", "username"):   "POOL_MQTT_USERNAME",
@@ -177,6 +179,10 @@ async def main() -> int:
     hardware.set_write_duration_hook(telemetry.record_dac_write_ms)
     pump_service.telemetry = telemetry
 
+    # Telegram (optional): Benachrichtigungen + Befehle, ruft pump_service
+    # direkt auf (gleiche Sperren wie Dashboard). Verbindung nur ausgehend.
+    telegram = TelegramService(config, pump_service, hardware)
+
     # FastAPI App
     api_config = config.get("api", {})
     app = create_app(pump_service, mqtt, hardware, api_config)
@@ -208,6 +214,7 @@ async def main() -> int:
     api_task = asyncio.create_task(server.serve(), name="api")
     mqtt_task = asyncio.create_task(mqtt.start(), name="mqtt")
     watchdog_task = asyncio.create_task(systemd_watchdog(pump_service), name="watchdog")
+    telegram_task = asyncio.create_task(telegram.start(), name="telegram")
 
     done, _ = await asyncio.wait({pump_task, api_task}, return_when=asyncio.FIRST_COMPLETED)
 
@@ -223,13 +230,19 @@ async def main() -> int:
     # Geordnet herunterfahren
     server.should_exit = True
     pump_service._running = False
-    for task in (pump_task, mqtt_task, watchdog_task):
+    for task in (pump_task, mqtt_task, watchdog_task, telegram_task):
         task.cancel()
     try:
         await asyncio.wait_for(api_task, timeout=5)
     except (asyncio.TimeoutError, asyncio.CancelledError, Exception):
         pass
-    await asyncio.gather(pump_task, mqtt_task, watchdog_task, return_exceptions=True)
+    await asyncio.gather(pump_task, mqtt_task, watchdog_task, telegram_task,
+                         return_exceptions=True)
+    await telegram.stop(
+        flush_timeout_s=3.0,
+        final_message=("🛑 Pool Marx beendet sich nach einem Fehler — systemd startet neu"
+                       if exit_code else "⏹ Pool Marx wird beendet"),
+    )
 
     hardware.cleanup()
     logger.info(f"Pool Marx beendet (Exit-Code {exit_code})")

@@ -144,6 +144,27 @@ api:
   # (auf dem Pi in /etc/pool_marx/secrets.env). Ohne Passwort ist die
   # Web-Steuerung gesperrt, die Automatik läuft weiter.
 
+# ── Telegram (optional) ──────────────────────────────────────
+# Benachrichtigungen und Befehle per Telegram-Bot. Der Pi baut die Verbindung
+# zu api.telegram.org:443 selbst auf (Long Polling) — keine Portfreigabe nötig.
+# Bot-Token NICHT hier: Umgebungsvariable POOL_TELEGRAM_TOKEN
+# (auf dem Pi in /etc/pool_marx/secrets.env). Einrichtung: docs/telegram.md
+telegram:
+  enabled: false
+  allowed_user_ids: []        # eigene Telegram-Nutzer-ID(s), z. B. [123456789]
+  notify_level: WARNING       # alles ab dieser Stufe wird gemeldet
+  notify_events:              # zusätzlich diese Ereignisse (Stufe INFO)
+    - frost.deactivated
+    - backwash.finished
+    - pump.mains_restore
+  notify_startup: true        # Meldung bei jedem Start (zeigt auch Neustarts durch den Watchdog)
+  commands_enabled: true      # false = nur /status und /hilfe
+  manual_duration_min: 120    # /pumpe und /aus gelten so lange, dann Zeitplan (0 = unbegrenzt)
+  max_command_age_s: 120      # ältere Befehle (Pi war offline) werden verworfen
+  confirm_timeout_s: 60       # Bestätigung für /rueckspuelen und /abschalten
+  max_messages_per_min: 6     # mehr Meldungen werden gesammelt und gebündelt
+  repeat_suppress_min: 15     # gleiche Meldung (z. B. MQTT-Reconnect) höchstens alle 15 Min
+
 # ── Logging ──────────────────────────────────────────────────
 logging:
   level: "INFO"

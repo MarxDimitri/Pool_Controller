@@ -12,6 +12,28 @@ Neue Einträge kommen unter **[Unreleased]**. `release/release.py` macht daraus 
 
 ## [Unreleased]
 
+### Added
+- Optionaler Telegram-Bot (`services/telegram_service.py`, Anleitung `docs/telegram.md`):
+  - Meldungen aufs Handy: alles ab `notify_level` (Standard WARNING) und ausgewählte Ereignisse
+    (Frostschutz aus, Rückspülung fertig, Netz wieder an). Gebündelt, höchstens 6 pro Minute,
+    gleiche Meldungen höchstens alle 15 Minuten. Meldung bei Start und Beenden.
+  - Befehle `/status`, `/pumpe <0–100> [Minuten]`, `/aus`, `/zeitplan`, `/licht an|aus`,
+    `/rueckspuelen` und `/abschalten` (beide mit Bestätigung), `/notiz`, `/hilfe`.
+    Manuelle Befehle laufen nach 120 Minuten ab, dann gilt wieder der Zeitplan.
+  - Nur freigegebene Nutzer-IDs, nur private Chats, alte Befehle werden verworfen.
+    Quittieren der Abschaltung geht bewusst nur am Dashboard.
+  - Nur ausgehende HTTPS-Verbindung zu `api.telegram.org` (Long Polling), keine Portfreigabe.
+- Neue Abhängigkeit `httpx` (bisher nur für Tests)
+
+### Einmalig beim Update auf dem Pi
+Ohne diese Schritte bleibt Telegram aus, alles andere läuft wie bisher.
+`httpx` installiert der Deploy automatisch im neuen venv.
+1. Bot bei @BotFather anlegen, Token als `POOL_TELEGRAM_TOKEN=` in `/etc/pool_marx/secrets.env`
+2. Eigene Nutzer-ID ermitteln (`docs/telegram.md`, Abschnitt 3)
+3. Abschnitt `telegram:` aus `config/config.yaml` in die `config.yaml` auf dem Pi übernehmen,
+   `enabled: true` und `allowed_user_ids` setzen
+4. Dienst neu starten, Startmeldung in Telegram prüfen
+
 ## [1.2.1] - 2026-11-25
 
 ### Fixed

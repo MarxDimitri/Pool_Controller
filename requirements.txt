@@ -5,6 +5,8 @@ uvicorn
 websockets
 pyyaml
 aiomqtt
+# Telegram-Bot (optional, nur ausgehendes HTTPS)
+httpx==0.28.1
 # Nur auf dem Raspberry Pi (ohne diese Pakete läuft die Software im Simulationsmodus)
 smbus2; platform_machine == "aarch64" or platform_machine == "armv7l"
 RPi.GPIO; platform_machine == "aarch64" or platform_machine == "armv7l"

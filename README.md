@@ -20,6 +20,9 @@ Runs on a Raspberry Pi 4. Without Pi hardware it falls back to a simulation mode
   Home Assistant discovery.
 - **Diagnostics:** every setpoint change and schedule transition is logged with a
   reason. A "fault note" endpoint records pump errors together with the current state.
+- **Optional Telegram bot**: notifications for warnings and selected events, and
+  commands (`/status`, `/pumpe 60`, `/abschalten` …) for whitelisted users. Outbound
+  HTTPS only (long polling), no open ports. Off by default.
 - **Optional telemetry** via OpenTelemetry (OTLP/HTTP), e.g. to Elastic. Off by
   default and never blocks the control loop.
 
@@ -57,10 +60,11 @@ main.py
  ├─ services/hardware.py      GPIO relays, float switch, MCP4725 + ramp/refresh thread
  ├─ services/mqtt_service.py  optional MQTT + Home Assistant discovery
  ├─ services/telemetry.py     optional OpenTelemetry logs/metrics (background exporter threads)
+ ├─ services/telegram_service.py  optional Telegram bot: notifications + commands
  └─ services/events.py        structured log events (event.name + attributes)
 ```
 
-- Secrets (dashboard password, MQTT password, telemetry API key) come from
+- Secrets (dashboard password, MQTT password, Telegram token, telemetry API key) come from
   environment variables (systemd `EnvironmentFile`), never from `config.yaml`.
   Templates are in [`pi/`](pi/).
 - Deployed as a systemd service with a watchdog. If a background task crashes,
@@ -104,6 +108,7 @@ How to cut and deploy a release: [RELEASE.md](RELEASE.md).
 
 - [docs/INBETRIEBNAHME.md](docs/INBETRIEBNAHME.md): installation on the Pi, configuration, calibration, operation, troubleshooting
 - [docs/telemetry.md](docs/telemetry.md): OpenTelemetry / Elastic setup, dashboards, alert rules
+- [docs/telegram.md](docs/telegram.md): Telegram bot setup, commands, network and security notes
 - [docs/abnahme.md](docs/abnahme.md): acceptance checklist for the real hardware
 - [ROADMAP.md](ROADMAP.md): open items (safety, hardware, software)
 

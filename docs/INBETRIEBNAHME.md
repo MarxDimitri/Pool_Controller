@@ -31,6 +31,7 @@ eingerichtet, kalibriert, getestet und betrieben wird.
 14. [Automatische Tests](#14-automatische-tests)
 
 Weitere Dokumente: [telemetry.md](telemetry.md) (Logs und Metriken nach Elastic) ·
+[telegram.md](telegram.md) (Meldungen und Steuerung per Telegram) ·
 [abnahme.md](abnahme.md) (Abnahmetests an der echten Hardware) ·
 `NETZWERK_SICHERHEIT.md` (Netzwerkkonzept, nur lokal, nicht im öffentlichen Repo)
 
@@ -45,6 +46,7 @@ Weitere Dokumente: [telemetry.md](telemetry.md) (Logs und Metriken nach Elastic)
 | `services/pump_service.py` | Zeitplan mit Mindestdrehzahl, Frostschutz, Rückspülung, manuelle Steuerung, verriegelte Abschaltung, Fehlernotiz |
 | `services/mqtt_service.py` | Optional: Status und Befehle über MQTT |
 | `services/telemetry.py` | Optional: Logs und Metriken per OpenTelemetry (→ [telemetry.md](telemetry.md)) |
+| `services/telegram_service.py` | Optional: Meldungen und Befehle per Telegram-Bot (→ [telegram.md](telegram.md)) |
 | `services/events.py` | Strukturierte Ereignisse im Log (`event.name`) für die Diagnose |
 | `api/main.py` | REST-API, WebSocket für Live-Updates, Login |
 | `web/index.html` | Dashboard im Browser |
@@ -208,6 +210,7 @@ sudo nano /etc/pool_marx/secrets.env
 | `POOL_API_SECRET` | Passwort für Dashboard und API, **mindestens 12 Zeichen**. Fehlt es, ist die Web-Steuerung gesperrt — die Automatik läuft trotzdem. |
 | `POOL_MQTT_PASSWORD` | Passwort für den MQTT-Broker (nur wenn MQTT genutzt wird) |
 | `POOL_MQTT_USERNAME` | optional, überschreibt `mqtt.username` |
+| `POOL_TELEGRAM_TOKEN` | optional, Token des Telegram-Bots (→ [telegram.md](telegram.md)) |
 
 Format: `KEY=wert`, ohne Anführungszeichen und ohne Leerzeichen um `=`.
 
@@ -249,9 +252,10 @@ Die wichtigsten Abschnitte in `config/config.yaml`:
 | `api` | Host und Port des Dashboards (Standard 8080) |
 | `logging` | Log-Level und Log-Datei |
 | `telemetry` | `enabled` (Standard false), `metrics_interval_s`, `log_level`, `fastapi_instrumentation`, `system_metrics` |
+| `telegram` | `enabled` (Standard false), `allowed_user_ids`, Meldungen und Befehle (→ [telegram.md](telegram.md), Abschnitt 4) |
 
-Fehlen `dac`, `pump.min_speed` oder `telemetry`, gelten sichere Standardwerte
-(Mindestdrehzahl aus, Telemetrie aus). Ungültige Werte werden mit einer Warnung
+Fehlen `dac`, `pump.min_speed`, `telemetry` oder `telegram`, gelten sichere Standardwerte
+(Mindestdrehzahl aus, Telemetrie aus, Telegram aus). Ungültige Werte werden mit einer Warnung
 im Log auf den Standard gesetzt oder geklemmt, z. B. `max_output_v` über 10 V
 hart auf 10 V.
 
@@ -326,6 +330,7 @@ Erwartet:
 - `Pool Marx API gestartet`
 - `Zeitplanwechsel: 'None' → '…'` und `Pumpe Sollwert 0% → …% (Grund: schedule …)`
 - nur mit Telemetrie: `Telemetrie aktiv: OTLP/HTTP → …`
+- nur mit Telegram: `Telegram aktiv: Bot @…, … Nutzer freigegeben, Befehle an`
 
 Nicht erwartet (beheben):
 - `POOL_API_SECRET fehlt …` → Kapitel 5
@@ -499,6 +504,12 @@ Befehle an `pool_marx/cmd/pump`: `on`, `off`, `speed:60`, `backwash`, `schedule`
 an `pool_marx/cmd/light`: `on`, `off`. Status unter `pool_marx/pump/…`.
 Mosquitto sollte nur auf `127.0.0.1` lauschen und anonyme Zugriffe verbieten.
 
+### 10.5 Telegram (optional)
+
+Meldungen aufs Handy und Befehle wie `/status`, `/pumpe 60`, `/abschalten`.
+Der Pi verbindet sich nur nach außen, es wird kein Port geöffnet. Quittieren
+geht bewusst nur am Dashboard. Einrichtung: [telegram.md](telegram.md).
+
 ---
 
 ## 11. Updates einspielen
@@ -560,6 +571,7 @@ einspielen (`git checkout vX.Y.Z` vor dem Kopieren); Änderungen stehen in
 | „Rückspülung gesperrt: Wasserstand zu niedrig“ | Schwimmerschalter meldet niedrig (Verkabelung/Pegel prüfen) |
 | Dienst startet ständig neu | `journalctl -u pool_marx -n 100` — Exit-Code 1 = Absturz in der Automatik, Ursache steht davor im Log |
 | MQTT-Reconnect-Meldungen alle 10 s | Broker nicht erreichbar; harmlos, wenn MQTT nicht genutzt wird |
+| `Telegram …` im Log | → [telegram.md](telegram.md), Abschnitt 7 |
 
 Nützliche Befehle:
 
@@ -590,6 +602,7 @@ curl http://localhost:8080/api/health      # lebt die API?
 - [ ] Alles abschalten → gesperrt → Quittieren getestet
 - [ ] Rückspülung einmal vollständig beobachtet (Ventil öffnet erst nach der Rampe)
 - [ ] Optional: Telemetrie eingerichtet, Daten in Elastic sichtbar ([telemetry.md](telemetry.md))
+- [ ] Optional: Telegram eingerichtet, Startmeldung kommt an, `/status` antwortet, fremder Account wird ignoriert ([telegram.md](telegram.md))
 - [ ] Pumpe am Pumpenrelais angeschlossen (derzeit nicht)
 - [ ] Reparaturschalter vor der Pumpe vorhanden
 - [ ] Elektrik abgenommen (RCD 30 mA, Potentialausgleich, 0-V-Masse getrennt von N)
